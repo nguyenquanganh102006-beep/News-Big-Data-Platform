@@ -2,7 +2,7 @@ import feedparser
 import polars as pl
 
 from config import (
-    DEBUG, DEFAULT_STRING, 
+    DEBUG, DEFAULT_STRING, FEEDPARSER_MAP_FIELDS,
     handleMetadateKey, handleColonKey, handleDuplicateKey, handleConvertCamelToSnake,
 )
 
@@ -49,6 +49,10 @@ def crawl_rss(
         if meta_key in metadata.keys():
             meta_key = handleDuplicateKey(meta_key)
         
+        # Handle specific fields converted by library feedparser
+        if key in FEEDPARSER_MAP_FIELDS.keys():
+            key = FEEDPARSER_MAP_FIELDS[key]
+        
         metadata[meta_key] = feed.feed.get(key, None)
     
     
@@ -63,6 +67,10 @@ def crawl_rss(
             
             if cleaned_key in article.keys():
                 cleaned_key = handleDuplicateKey(cleaned_key)
+            
+            # Handle specific fields
+            if key in FEEDPARSER_MAP_FIELDS.keys():
+                key = FEEDPARSER_MAP_FIELDS[key]
             
             article[cleaned_key] = entry.get(key, None)
         

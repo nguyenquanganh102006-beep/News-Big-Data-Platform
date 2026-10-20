@@ -9,6 +9,10 @@ from .schemas import (
     RssTienphongBronzeModel,
 )
 
+FEEDPARSER_MAP_FIELDS = {
+    "pubDate": "published",
+}
+
 RSS_SOURCES = {
     "vnexpress": {
         "url": "https://vnexpress.net/rss/thoi-su.rss",
