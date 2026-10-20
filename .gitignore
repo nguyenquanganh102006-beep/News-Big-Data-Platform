@@ -1,0 +1,13 @@
+# Python
+.venv
+__pycache__
+
+# Python dev
+src/news_big_data_platform.egg-info
+
+# Secret
+.env
+
+# Dev / Local dev
+.vscode
+data
