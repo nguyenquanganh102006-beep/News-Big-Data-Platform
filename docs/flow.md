@@ -65,3 +65,36 @@ python -m crawlers.run
 + Output: `.parquet` files saved in `data/bronze/`
 
 
+
+### 3. Preprocessors
+
++ Folder relationship structure
+
+```text
+News-Big-Data-Platform/
+|-- data/
+    |-- bronze/                 # Input taken from here
+    |-- silver/                 # Output saved here
+|-- src/
+    |-- config/
+        |-- crawlers.py             # Crawler configs
+    |-- preprocessors/
+        |-- rss_vnexpress.py        # RSS preprocessors for source "vnexpress"
+        |-- rss_tuoitre.py          # Another example
+        |-- [type]_[source].py      # General format of each source
+        |-- ...                     # Analogous files followed above format
+        |-- utils.py                # Contains all utils, helpers, ...
+        |-- run.py                  # Main file to run all the preprocessors
+```
+
++ Input: `.parquet` files saved in `data/bronze/` (output of the `crawlers` module)
+
++ Run pipeline
+```bash
+cd src
+python -m preprocessors.run
+```
+
++ Output: `.parquet` files saved in `data/silver/`
+
+

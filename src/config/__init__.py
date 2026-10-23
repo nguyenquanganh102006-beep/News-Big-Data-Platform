@@ -1,6 +1,6 @@
 from .main import (
     PRODUCTION_ENV, DEBUG, 
-    PWD, DATA_DIR, DATA_BRONZE_DIR, 
+    PWD, DATA_DIR, DATA_BRONZE_DIR, DATA_SILVER_DIR,
     DEFAULT_STRING,
 )
 from .schemas import (
@@ -13,7 +13,7 @@ from .crawlers import (
 )
 
 __all__ = [
-    "PRODUCTION_ENV", "DEBUG", "PWD", "DATA_DIR", "DATA_BRONZE_DIR", "DEFAULT_STRING",
+    "PRODUCTION_ENV", "DEBUG", "PWD", "DATA_DIR", "DATA_BRONZE_DIR", "DATA_SILVER_DIR", "DEFAULT_STRING",
     "RssBronzeBaseModel", "RssVnexpressBronzeModel", "RssVietnamplusBronzeModel", "RssTuoitreBronzeModel", "RssDantriBronzeModel", "RssThanhnienBronzeModel", "RssBaoxaydungBronzeModel", "RssTienphongBronzeModel",
     "RSS_SOURCES", "HTML_SOURCES", "FEEDPARSER_MAP_FIELDS", "handleMetadateKey", "handleColonKey", "handleDuplicateKey", "handleConvertCamelToSnake",
 ]
