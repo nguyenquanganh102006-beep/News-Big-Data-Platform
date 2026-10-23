@@ -98,4 +98,9 @@ Chỉnh sửa các biến, ví dụ biến `DEBUG` để print ra màn hình, gi
 
 ## 7. Chạy các luồng 
 
-Xem cụ thể ở file [`docs/flow.md`](./flow.md) rồi chạy từng luồng nhỏ (partial flows)
+Xem cụ thể ở file [`docs/flow.md`](./flow.md) rồi chạy từng luồng phụ (partial flows)
+
+>[!NOTE]
+> Do trong các luồng phụ tôi mặc định là folder đã tồn tại, nên ae tạo folder thủ công nhé (nhớ xem folder structure trong `flow.md` trước rồi tạo theo cho đúng)
+> Folders cần tạo thủ công: `data/bronze`, `data/silver`, `data/gold`
+> Sau này khi làm luồng chính (tổng hợp các luồng phụ) tôi mới thêm các hàm tạo folder tự động (`os.makedir()`) sau
