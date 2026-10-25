@@ -1,0 +1,104 @@
+{
+  "crawl_runs": 3,
+  "rows_per_run": 410,
+  "unique_source_urls": 414,
+  "reviewed_samples": 70,
+  "labels": {
+    "accident": 28,
+    "not_accident": 35,
+    "uncertain": 7
+  },
+  "sources": {
+    "baoxaydung": {
+      "snapshots": [
+        "data/bronze/baoxaydung/20261025_230215.parquet",
+        "data/bronze/baoxaydung/20261025_230218.parquet",
+        "data/bronze/baoxaydung/20261025_230221.parquet"
+      ],
+      "rows_per_run": [
+        50,
+        50,
+        50
+      ],
+      "unique_urls": 50
+    },
+    "vnexpress": {
+      "snapshots": [
+        "data/bronze/vnexpress/20261025_230215.parquet",
+        "data/bronze/vnexpress/20261025_230218.parquet",
+        "data/bronze/vnexpress/20261025_230221.parquet"
+      ],
+      "rows_per_run": [
+        60,
+        60,
+        60
+      ],
+      "unique_urls": 60
+    },
+    "dantri": {
+      "snapshots": [
+        "data/bronze/dantri/20261025_230215.parquet",
+        "data/bronze/dantri/20261025_230218.parquet",
+        "data/bronze/dantri/20261025_230221.parquet"
+      ],
+      "rows_per_run": [
+        100,
+        100,
+        100
+      ],
+      "unique_urls": 100
+    },
+    "thanhnien": {
+      "snapshots": [
+        "data/bronze/thanhnien/20261025_230215.parquet",
+        "data/bronze/thanhnien/20261025_230218.parquet",
+        "data/bronze/thanhnien/20261025_230221.parquet"
+      ],
+      "rows_per_run": [
+        50,
+        50,
+        50
+      ],
+      "unique_urls": 50
+    },
+    "tuoitre": {
+      "snapshots": [
+        "data/bronze/tuoitre/20261025_230215.parquet",
+        "data/bronze/tuoitre/20261025_230218.parquet",
+        "data/bronze/tuoitre/20261025_230221.parquet"
+      ],
+      "rows_per_run": [
+        50,
+        50,
+        50
+      ],
+      "unique_urls": 54
+    },
+    "vietnamplus": {
+      "snapshots": [
+        "data/bronze/vietnamplus/20261025_230215.parquet",
+        "data/bronze/vietnamplus/20261025_230218.parquet",
+        "data/bronze/vietnamplus/20261025_230221.parquet"
+      ],
+      "rows_per_run": [
+        50,
+        50,
+        50
+      ],
+      "unique_urls": 50
+    },
+    "tienphong": {
+      "snapshots": [
+        "data/bronze/tienphong/20261025_230215.parquet",
+        "data/bronze/tienphong/20261025_230218.parquet",
+        "data/bronze/tienphong/20261025_230221.parquet"
+      ],
+      "rows_per_run": [
+        50,
+        50,
+        50
+      ],
+      "unique_urls": 50
+    }
+  }
+}

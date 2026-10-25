@@ -1,0 +1,32 @@
+{
+  "version": "rules-v1",
+  "evaluation_kind": "development_resubstitution_not_independent_test",
+  "samples": 414,
+  "known_label_samples": 405,
+  "known_label_exact_accuracy": 0.9950617283950617,
+  "three_label_accuracy": 0.9927536231884058,
+  "precision_accident": 1.0,
+  "recall_accident": 0.9333333333333333,
+  "f1_accident": 0.9655172413793104,
+  "true_positive": 28,
+  "false_positive": 0,
+  "false_negative_including_abstentions": 2,
+  "confusion_matrix_actual_to_predicted": {
+    "accident": {
+      "accident": 28,
+      "uncertain": 2
+    },
+    "not_accident": {
+      "not_accident": 375
+    },
+    "uncertain": {
+      "uncertain": 8,
+      "not_accident": 1
+    }
+  },
+  "errors": [
+    "dantri:65",
+    "dantri:91",
+    "thanhnien:4"
+  ]
+}
