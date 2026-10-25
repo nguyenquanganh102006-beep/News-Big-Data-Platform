@@ -22,7 +22,7 @@ RSS_SOURCES = {
         "meta_keys": ["title", "description", "pubDate", "generator", "link"],
         "entry_keys": ["title", "description", "pubDate", "link", "guid"],
         "schema": RssVnexpressBronzeModel,
-        "bronze_save_path": os.path.join(DATA_BRONZE_DIR, "vnexpress.parquet"),
+        "bronze_dir": os.path.join(DATA_BRONZE_DIR, "vnexpress"),
         "silver_save_path": os.path.join(DATA_SILVER_DIR, "vnexpress.parquet"),
     },
     "vietnamplus": {
@@ -30,7 +30,7 @@ RSS_SOURCES = {
         "meta_keys": ["title", "copyright", "link", "lastBuildDate", "pubDate", "description", "language", "docs", "managingEditor", "webMaster", "ttl", "atom:link"],
         "entry_keys": ["title", "description", "pubDate", "updated", "link", "atom:link", "guid"],
         "schema": RssVietnamplusBronzeModel,
-        "bronze_save_path": os.path.join(DATA_BRONZE_DIR, "vietnamplus.parquet"),
+        "bronze_dir": os.path.join(DATA_BRONZE_DIR, "vietnamplus"),
         "silver_save_path": os.path.join(DATA_SILVER_DIR, "vietnamplus.parquet"),
     },
     "tuoitre": {
@@ -38,7 +38,7 @@ RSS_SOURCES = {
         "meta_keys": ["title", "description", "link", "language", "copyright", "lastBuildDate", "docs", "generator", "ttl"],
         "entry_keys": ["title", "description", "pubDate", "link", "author"],
         "schema": RssTuoitreBronzeModel,
-        "bronze_save_path": os.path.join(DATA_BRONZE_DIR, "tuoitre.parquet"),
+        "bronze_dir": os.path.join(DATA_BRONZE_DIR, "tuoitre"),
         "silver_save_path": os.path.join(DATA_SILVER_DIR, "tuoitre.parquet"),
     },
     "dantri": {
@@ -46,7 +46,7 @@ RSS_SOURCES = {
         "meta_keys": ["title", "atom:link", "link", "description", "lastBuildDate", "pubDate", "language", "copyright", "sy:updatePeriod", "sy:updateFrequency", "ttl"],
         "entry_keys": ["title", "description", "pubDate", "link", "guid", "dc:creator", "category"],
         "schema": RssDantriBronzeModel,
-        "bronze_save_path": os.path.join(DATA_BRONZE_DIR, "dantri.parquet"),
+        "bronze_dir": os.path.join(DATA_BRONZE_DIR, "dantri"),
         "silver_save_path": os.path.join(DATA_SILVER_DIR, "dantri.parquet"),
     },
     "thanhnien": {
@@ -54,7 +54,7 @@ RSS_SOURCES = {
         "meta_keys": ["title", "link", "description", "atom:link", "copyright", "generator", "pubDate", "language", "lastBuildDate", "atom:link", "ttl"],
         "entry_keys": ["title", "description", "pubDate", "link", "guid"],
         "schema": RssThanhnienBronzeModel,
-        "bronze_save_path": os.path.join(DATA_BRONZE_DIR, "thanhnien.parquet"),
+        "bronze_dir": os.path.join(DATA_BRONZE_DIR, "thanhnien"),
         "silver_save_path": os.path.join(DATA_SILVER_DIR, "thanhnien.parquet"),
     },
     "baoxaydung": {
@@ -62,7 +62,7 @@ RSS_SOURCES = {
         "meta_keys": ["title", "link", "description", "atom:link", "copyright", "generator", "pubDate", "language", "lastBuildDate", "atom:link", "ttl"],
         "entry_keys": ["title", "description", "pubDate", "link", "guid"],
         "schema": RssBaoxaydungBronzeModel,
-        "bronze_save_path": os.path.join(DATA_BRONZE_DIR, "baoxaydung.parquet"),
+        "bronze_dir": os.path.join(DATA_BRONZE_DIR, "baoxaydung"),
         "silver_save_path": os.path.join(DATA_SILVER_DIR, "baoxaydung.parquet"),
     },
     "tienphong": {
@@ -70,7 +70,7 @@ RSS_SOURCES = {
         "meta_keys": ["title", "copyright", "link", "lastBuildDate", "pubDate", "description", "language", "docs", "managingEditor", "webMaster", "ttl", "atom:link"],
         "entry_keys": ["title", "description", "pubDate", "updated", "link", "atom:link", "guid"],
         "schema": RssTienphongBronzeModel,
-        "bronze_save_path": os.path.join(DATA_BRONZE_DIR, "tienphong.parquet"),
+        "bronze_dir": os.path.join(DATA_BRONZE_DIR, "tienphong"),
         "silver_save_path": os.path.join(DATA_SILVER_DIR, "tienphong.parquet"),
     },
 }
