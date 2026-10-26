@@ -1,3 +1,4 @@
+import os
 import re
 from .schemas import (
     RssVnexpressBronzeModel,
@@ -8,6 +9,8 @@ from .schemas import (
     RssBaoxaydungBronzeModel,
     RssTienphongBronzeModel,
 )
+from .main import DATA_BRONZE_DIR, DATA_SILVER_DIR
+
 
 FEEDPARSER_MAP_FIELDS = {
     "pubDate": "published",
@@ -19,42 +22,56 @@ RSS_SOURCES = {
         "meta_keys": ["title", "description", "pubDate", "generator", "link"],
         "entry_keys": ["title", "description", "pubDate", "link", "guid"],
         "schema": RssVnexpressBronzeModel,
+        "bronze_save_path": os.path.join(DATA_BRONZE_DIR, "vnexpress.parquet"),
+        "silver_save_path": os.path.join(DATA_SILVER_DIR, "vnexpress.parquet"),
     },
     "vietnamplus": {
         "url": "https://www.vietnamplus.vn/rss/xahoi/giaothong-358.rss",
         "meta_keys": ["title", "copyright", "link", "lastBuildDate", "pubDate", "description", "language", "docs", "managingEditor", "webMaster", "ttl", "atom:link"],
         "entry_keys": ["title", "description", "pubDate", "updated", "link", "atom:link", "guid"],
         "schema": RssVietnamplusBronzeModel,
+        "bronze_save_path": os.path.join(DATA_BRONZE_DIR, "vietnamplus.parquet"),
+        "silver_save_path": os.path.join(DATA_SILVER_DIR, "vietnamplus.parquet"),
     },
     "tuoitre": {
         "url": "https://tuoitre.vn/thoi-su.rss",
         "meta_keys": ["title", "description", "link", "language", "copyright", "lastBuildDate", "docs", "generator", "ttl"],
         "entry_keys": ["title", "description", "pubDate", "link", "author"],
         "schema": RssTuoitreBronzeModel,
+        "bronze_save_path": os.path.join(DATA_BRONZE_DIR, "tuoitre.parquet"),
+        "silver_save_path": os.path.join(DATA_SILVER_DIR, "tuoitre.parquet"),
     },
     "dantri": {
         "url": "https://dantri.com.vn/rss/thoi-su.rss",
         "meta_keys": ["title", "atom:link", "link", "description", "lastBuildDate", "pubDate", "language", "copyright", "sy:updatePeriod", "sy:updateFrequency", "ttl"],
         "entry_keys": ["title", "description", "pubDate", "link", "guid", "dc:creator", "category"],
         "schema": RssDantriBronzeModel,
+        "bronze_save_path": os.path.join(DATA_BRONZE_DIR, "dantri.parquet"),
+        "silver_save_path": os.path.join(DATA_SILVER_DIR, "dantri.parquet"),
     },
     "thanhnien": {
         "url": "https://thanhnien.vn/rss/xe/xe-giao-thong.rss",
         "meta_keys": ["title", "link", "description", "atom:link", "copyright", "generator", "pubDate", "language", "lastBuildDate", "atom:link", "ttl"],
         "entry_keys": ["title", "description", "pubDate", "link", "guid"],
         "schema": RssThanhnienBronzeModel,
+        "bronze_save_path": os.path.join(DATA_BRONZE_DIR, "thanhnien.parquet"),
+        "silver_save_path": os.path.join(DATA_SILVER_DIR, "thanhnien.parquet"),
     },
     "baoxaydung": {
         "url": "https://baoxaydung.vn/rss/an-toan-giao-thong/giao-thong-24h.rss",
         "meta_keys": ["title", "link", "description", "atom:link", "copyright", "generator", "pubDate", "language", "lastBuildDate", "atom:link", "ttl"],
         "entry_keys": ["title", "description", "pubDate", "link", "guid"],
         "schema": RssBaoxaydungBronzeModel,
+        "bronze_save_path": os.path.join(DATA_BRONZE_DIR, "baoxaydung.parquet"),
+        "silver_save_path": os.path.join(DATA_SILVER_DIR, "baoxaydung.parquet"),
     },
     "tienphong": {
         "url": "https://tienphong.vn/rss/nstd-giao-thong-do-thi-244.rss",
         "meta_keys": ["title", "copyright", "link", "lastBuildDate", "pubDate", "description", "language", "docs", "managingEditor", "webMaster", "ttl", "atom:link"],
         "entry_keys": ["title", "description", "pubDate", "updated", "link", "atom:link", "guid"],
         "schema": RssTienphongBronzeModel,
+        "bronze_save_path": os.path.join(DATA_BRONZE_DIR, "tienphong.parquet"),
+        "silver_save_path": os.path.join(DATA_SILVER_DIR, "tienphong.parquet"),
     },
 }
 
