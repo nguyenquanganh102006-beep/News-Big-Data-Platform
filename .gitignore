@@ -11,3 +11,8 @@ src/news_big_data_platform.egg-info
 # Dev / Local dev
 .vscode
 data
+
+# Generated evaluation artifacts (regenerate with filters.evaluate)
+/docs/details/accident_filter/evaluation_*/
+/docs/details/accident_filter/*.json
+/docs/details/accident_filter/*.jsonl

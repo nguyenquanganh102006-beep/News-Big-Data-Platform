@@ -10,15 +10,9 @@
 
 Luồng: crawl RSS → Bronze theo từng lần crawl → preprocess/dedup → Silver tích lũy → lọc vào `data/filtered/<source>/`. Dùng `--skip-crawl` để dùng Bronze mới nhất; dùng `python -m filters.run` để chỉ lọc lại Silver. Hỗ trợ 3 nguồn đã có preprocessor. Chi tiết input/output, schema, cấu hình, xử lý lỗi và test: [hướng dẫn luồng lọc](details/accident_filter/pipeline.md).
 
-## Khảo sát tiêu chí lọc tai nạn (task 23)
+## Tiêu chí và đánh giá bộ lọc tai nạn
 
-Đã chạy nguyên luật v1 trên 414 bài: [kết quả và lỗi cụ thể](details/accident_filter/evaluation_v1_414/report.md). Lệnh chạy lại được ghi trong báo cáo.
-
-Đã đọc và gán nhãn đủ 414 bài: xem [bảng đọc thủ công đầy đủ](details/accident_filter/manual_review_414.md), dữ liệu nhãn `reviewed_all_414.jsonl` cùng thư mục. Kết quả 30 bài tai nạn, 375 bài không phù hợp và 9 bài chưa chốt phạm vi; bước gán nhãn không sửa Bronze/Silver.
-
-Bộ lọc if/else v1 và cách chạy đánh giá: [rules_v1.md](details/accident_filter/rules_v1.md). Chạy từ thư mục gốc: `.\.venv\Scripts\python.exe -m filters.evaluate`. Lệnh chỉ đánh giá mẫu và ghi báo cáo, chưa lọc trực tiếp Silver hay tạo Gold.
-
-Xem [tiêu chí và kết quả đọc mẫu](details/accident_filter/criteria.md). Bộ mẫu gán nhãn thủ công nằm trong `docs/details/accident_filter/reviewed_samples.jsonl`; danh sách 3 lần crawl trong `crawl_manifest.json` cùng thư mục. Đây là bước khảo sát, chưa chạy bộ lọc tự động hoặc tạo Gold.
+Xem [tiêu chí](details/accident_filter/criteria.md) và [cách sinh kết quả đánh giá](details/accident_filter/rules_v1.md). Bộ nhãn trợ lý tự gán và báo cáo điểm số cũ đã được loại bỏ. Đánh giá cần dữ liệu tham chiếu được kiểm duyệt, truyền qua `--samples`; kết quả sinh ra nằm trong `data/evaluation/accident_filter/` và không commit vào Git.
 
 ## Folder architecture
 

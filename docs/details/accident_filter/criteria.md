@@ -1,20 +1,6 @@
 # Tiêu chí lọc bài tai nạn giao thông — task 23
 
-## Cập nhật: đã đọc đủ 414 bài
-
-Đã mở rộng từ 70 mẫu có chủ đích sang toàn bộ 414 bài của đúng 3 lần crawl trong manifest: **30 accident, 375 not_accident, 9 uncertain**. Đọc tiêu đề và mô tả RSS của từng bài, không dùng rules-v1 để gán nhãn. Các nhãn của 70 bài cũ được đối chiếu theo nguồn + URL và giữ nguyên.
-
-Xem [bảng đầy đủ 414 bài và danh sách được chọn](manual_review_414.md). `reviewed_all_414.jsonl` chứa văn bản bằng chứng, lý do, nhãn, snapshot và chỉ số đọc cho từng bài. `selected_accidents_30.jsonl` chỉ gồm 30 bài được chọn; `needs_review_9.jsonl` chứa 9 bài chưa chốt. Tổng hợp theo nguồn nằm ở `manual_review_summary.json`.
-
-So với 70 mẫu cũ, phát hiện thêm 2 bài tai nạn của Dân Trí (tai nạn trên cao tốc TP.HCM–Long Thành và người đi xe đạp va chạm container), cùng 2 bài đường thủy cần chốt phạm vi. Các bài mới còn lại được gán not_accident theo chủ đề chính. Không coi nhiều bài cùng vụ là nhiều vụ tai nạn khác nhau.
-
-“Thủ công” ở đây là trợ lý đọc và quyết định từ title + description, không phải con người xác nhận hoặc kiểm chứng ngoài đời, và chưa đọc thân bài. Bộ 414 vẫn cùng đợt crawl, có chứa 70 mẫu phát triển; không được gọi là test độc lập.
-
-## Dữ liệu khảo sát
-
-Chạy crawler RSS 3 lần liên tiếp, mỗi lần 410 bản tin từ 7 nguồn. Tổng cộng 1.230 dòng, gộp theo `(source, link)` còn 414 bài. Chi tiết tên snapshot và số dòng trong `crawl_manifest.json`. Các lần chạy gần nhau nên phần lớn bài giống nhau; đây chưa phải mẫu đại diện theo nhiều ngày.
-
-Đọc và gán nhãn thủ công 70 bài có chủ đích, gồm bài rõ ràng và các trường hợp dễ nhầm: 28 `accident`, 35 `not_accident`, 7 `uncertain`. Không dùng keyword hay mô hình để tự gán nhãn. Nhãn dựa trên tiêu đề và mô tả RSS, không phải xác minh sự kiện ngoài đời hay đọc toàn bộ thân bài. Danh sách có URL, văn bản đã đọc, nhãn, lý do và snapshot trong `reviewed_samples.jsonl`. Chỉ 70 bài được gán nhãn, không suy diễn nhãn cho toàn bộ 414 bài.
+Bộ nhãn do trợ lý tự gán và các thống kê phụ thuộc vào bộ nhãn đó đã được loại bỏ. Các tiêu chí dưới đây là hướng dẫn thiết kế bộ lọc, chưa phải kết quả kiểm định chất lượng. Cách đánh giá bằng nhãn được kiểm duyệt: [rules_v1.md](rules_v1.md).
 
 ## Quyết định nhãn
 
@@ -39,10 +25,6 @@ Phạm vi chắc chắn của bản đầu: đường bộ, gồm xe đạp, xe 
 9. Không bắt buộc địa điểm cấp tỉnh/huyện hoặc ngày giờ đầy đủ để giữ bài. Thanh Niên có clip taxi thực sự đâm ô tô nhưng RSS chưa nêu rõ địa phương: vẫn chọn; bước trích xuất sau có thể trả địa điểm null.
 10. Ưu tiên chủ đề chính của tiêu đề + phần mô tả chính. RSS VietnamPlus và Tiền Phong có chèn link bài liên quan: “Cầu Nhật Tân xuất hiện loạt biển báo…” có mô tả chứa “Ô tô lật ngửa…” nhưng chính bài là biển báo, nên loại. Khi viết bộ lọc cần tách link liên quan từ HTML trước khi ghép văn bản; không mặc định mọi liên kết là nhiễu vì một số nguồn bọc ảnh hoặc nội dung chính trong thẻ `a`.
 
-## Trường hợp cần xem thêm
+## Kiểm duyệt và đánh giá
 
-7 mẫu `uncertain` bao gồm cháy xe, chìm phà/tàu, tàu va cầu cảng và xe múc lật khi thi công. Cần chốt phạm vi nghiệp vụ trước khi đổi nhãn. Bài nhiều tin tổng hợp hoặc thiếu mô tả nên đưa vào `uncertain` khi chưa xác định được tai nạn là nội dung chính. Chưa gán nhãn cho loại nhiều tin trong bộ mẫu này.
-
-## Dùng cho bước tiếp theo
-
-Chưa có bộ lọc tự động và chưa thay đổi Silver/Gold. Có thể dùng mẫu này để thiết kế luật, nhưng không dùng chính mẫu thiết kế để báo cáo độ chính xác tổng quát. Cần thêm mẫu độc lập ở các ngày khác, bài không thương vong, bài nhiều sự kiện và mẫu âm khó trước khi nghiệm thu. Các tỷ lệ 28/35/7 là thành phần mẫu chọn có chủ đích, không phải tỷ lệ bài tai nạn trong feed hoặc precision/recall.
+Người kiểm duyệt cần chốt phạm vi các trường hợp đường thủy, cháy xe và xe công trình trước khi gán nhãn. Tách dữ liệu đánh giá theo ngày và sự kiện khỏi dữ liệu dùng xây luật; không lấy dự đoán của bộ lọc làm nhãn chuẩn cho chính nó.

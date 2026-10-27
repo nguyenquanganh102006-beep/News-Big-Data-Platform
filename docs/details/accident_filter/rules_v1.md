@@ -1,15 +1,25 @@
-# Bộ luật lọc tai nạn v1 và kết quả thử
+# Bộ luật lọc tai nạn v1 và cách sinh kết quả
 
-## Cách chạy
+## Đánh giá trên dữ liệu được kiểm duyệt
 
-Từ thư mục gốc, sau khi cài dependencies:
+Sau khi cài đặt theo [pipeline.md](pipeline.md), chuẩn bị `data/reviewed_accidents.jsonl` do người kiểm duyệt cung cấp. Mỗi dòng là một object JSON có `sample_id`, `title`, `description_text` (có thể null), `label`. Nhãn hợp lệ: `accident`, `not_accident`, `uncertain`. File này không được script tự tạo nhãn chuẩn; không dùng kết quả của bộ lọc làm nhãn tham chiếu.
+
+Từ thư mục gốc:
 
 ```powershell
-.\.venv\Scripts\python.exe -m filters.evaluate
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe -m filters.evaluate --samples data/reviewed_accidents.jsonl --output data/evaluation/accident_filter
 ```
 
-`src/filters/accident.py` nhận title/description và trả về label, reason, evidence, version. Chưa nối vào pipeline Silver/Gold, không sửa dữ liệu bài báo. Lệnh đánh giá đọc bộ 70 mẫu thủ công và ghi `evaluation_v1/metrics.json` cùng `evaluation_v1/predictions.jsonl` có kết quả từng bài. Chạy trên mẫu khác bằng `--samples <file.jsonl> --output <thư_mục>`.
+`src/filters/evaluate.py` đọc từng dòng, gọi `classify_accident(title, description_text)` trong `src/filters/accident.py`, rồi ghi:
+
+- `predictions.jsonl`: giữ dữ liệu đầu vào và thêm object `prediction` gồm nhãn, lý do, bằng chứng và phiên bản luật.
+- `metrics.json`: số mẫu, ma trận nhầm lẫn, accuracy, precision, recall, F1 và ID các mẫu không khớp nhãn tham chiếu.
+
+Thư mục đầu ra tự tạo; hai file được ghi đè khi chạy lại. Nếu không truyền `--output`, mặc định dùng `data/evaluation/accident_filter`. Cần truyền `--samples` rõ ràng. `data/` đã được bỏ qua trong Git; các thư mục `docs/details/accident_filter/evaluation_*/` và file JSON/JSONL trực tiếp trong thư mục này cũng được bỏ qua để tránh commit lại đầu ra cũ.
+
+## Dữ liệu cũ đã loại bỏ
+
+Đã xóa bộ nhãn trợ lý tự gán (`reviewed_samples.jsonl`, `reviewed_all_414.jsonl`), các bản trích/tổng hợp (`selected_accidents_30.jsonl`, `needs_review_9.jsonl`, `manual_review_summary.json`, `manual_review_414.md`), bản manifest khảo sát không có lệnh tái tạo được xác minh và báo cáo đánh giá phụ thuộc vào chúng. Không có lệnh sinh lại nhãn chuẩn tự động. Các điểm số cũ không còn được dùng làm bằng chứng chất lượng.
 
 ## Thứ tự if/else
 
@@ -26,28 +36,10 @@ Từ thư mục gốc, sau khi cài dependencies:
 
 Luật không đọc nhãn, lý do thủ công, URL, tên nguồn hay sample_id để quyết định. Không yêu cầu có tử vong. Mỗi quyết định có mã lý do để kiểm tra.
 
-## Kết quả lần đo đầu
+## Giới hạn và kiểm tra
 
-Đây là **đánh giá trên mẫu phát triển đã dùng xây tiêu chí**, không phải test độc lập. Không chỉnh luật sau lần đo này để che lỗi.
+Luật từ vựng có thể nhầm phủ định, giả định, bài trộn nhiều tin và quan hệ giữa phương tiện với tai nạn. Câu đầu mô tả có thể thiếu bằng chứng; nhóm uncertain cần được xem xét. Chưa có kết quả đánh giá độc lập được giữ lại trong repo. Bộ kiểm tra chức năng không thay thế đánh giá chất lượng trên dữ liệu thực.
 
-| Nhãn thủ công | Dự đoán accident | Dự đoán not_accident | Dự đoán uncertain |
-|---|---:|---:|---:|
-| accident (28) | 27 | 0 | 1 |
-| not_accident (35) | 0 | 35 | 0 |
-| uncertain (7) | 0 | 0 | 7 |
-
-- Accuracy trên 63 mẫu có nhãn chắc chắn: 62/63 = **98,41%**. Dự đoán uncertain trên một mẫu chắc chắn tính là sai.
-- Precision lớp accident: 27/27 = **100%** trên mẫu này.
-- Recall lớp accident: 27/28 = **96,43%**; bản uncertain bị tính là bỏ sót.
-- F1 lớp accident: **98,18%**.
-- Khớp cả 3 nhãn trên 70 bài: 69/70 = **98,57%**. Bảy bài uncertain không được coi là mẫu âm để tính precision/recall nhị phân.
-
-Bài bỏ sót `thanhnien:4`: “Xe taxi quyết không nhường đường ô tô đi ngược chiều, dẫn đến tai nạn đối đầu”. Lead dùng “lao thẳng vào”, trong khi mẫu luật chỉ nhận “lao vào”/“lao trúng”; tiêu đề “dẫn đến tai nạn” cũng chưa có trong nhánh sự kiện cụ thể. Kết quả là uncertain, không tự động chọn.
-
-## Giới hạn trước khi dùng thật
-
-Mẫu nhỏ, chọn có chủ đích và nhiều bài cùng một sự kiện Hải Phòng nên các kết quả không độc lập về sự kiện. Chưa chứng minh mức 98% trên feed mới. Không có mẫu ngẫu nhiên đủ lớn để ước lượng tỷ lệ tai nạn thực tế.
-
-Luật từ vựng có thể nhầm phủ định, giả định chưa nằm trong danh sách, bài trộn nhiều tin, từ đồng nghĩa và quan hệ giữa phương tiện với tai nạn. Dùng câu đầu có thể bỏ mất bằng chứng hoặc cắt nhầm dấu chấm trong địa danh; chặn từ khóa chủ đề có thể loại nhầm bài xử phạt thực sự phát sinh từ tai nạn. Nhãn uncertain cần người xem lại.
-
-Bước tiếp theo: khóa phiên bản v1, thu và gán nhãn bộ mới vào ngày khác, tránh trùng URL **và cùng vụ việc** với 70 mẫu này, rồi đo lại. Nếu sửa luật từ lỗi hiện tại thì tăng phiên bản và báo kết quả riêng; không gọi mẫu cũ là test độc lập.
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+```

@@ -34,8 +34,8 @@ def evaluate(samples):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--samples", type=Path, default=Path("docs/details/accident_filter/reviewed_samples.jsonl"))
-    parser.add_argument("--output", type=Path, default=Path("docs/details/accident_filter/evaluation_v1"))
+    parser.add_argument("--samples", type=Path, required=True, help="JSONL nhãn tham chiếu đã được kiểm duyệt; không tự sinh nhãn chuẩn")
+    parser.add_argument("--output", type=Path, default=Path("data/evaluation/accident_filter"))
     args = parser.parse_args()
     samples = [json.loads(line) for line in args.samples.read_text(encoding="utf-8").splitlines() if line.strip()]
     metrics, predictions = evaluate(samples)

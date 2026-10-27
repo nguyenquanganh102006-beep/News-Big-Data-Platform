@@ -4,7 +4,7 @@
 
 Áp dụng nguyên bộ `rules-v1` đã chốt vào dữ liệu Silver tích lũy. Dùng `title` và câu đầu `description`, không tải thân bài, không thay đổi luật sau đánh giá. Mỗi dòng là một bài báo, không phải một vụ tai nạn độc lập. Chưa trích xuất province, district, vehicles, casualties và chưa tạo Gold nghiệp vụ.
 
-Nguồn đang hỗ trợ: VnExpress, VietnamPlus, Tuổi Trẻ, tương ứng 3 preprocessor hiện có. Crawler vẫn lấy 7 nguồn nhưng 4 nguồn còn lại chưa có Silver nên chưa được lọc trong luồng này. Bộ 414 mẫu khảo sát từ 7 nguồn là tập đánh giá riêng, không phải input mặc định của pipeline.
+Nguồn đang hỗ trợ: VnExpress, VietnamPlus, Tuổi Trẻ, tương ứng 3 preprocessor hiện có. Crawler vẫn lấy 7 nguồn nhưng 4 nguồn còn lại chưa có Silver nên chưa được lọc trong luồng này.
 
 ## Cài đặt và chạy
 
@@ -90,9 +90,9 @@ Luôn có `input = accident + not_accident + uncertain`. Đây là số bài tr�
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
-.\.venv\Scripts\python.exe -m filters.evaluate --samples docs/details/accident_filter/reviewed_all_414.jsonl --output docs/details/accident_filter/evaluation_v1_414
+.\.venv\Scripts\python.exe -m filters.evaluate --samples data/reviewed_accidents.jsonl --output data/evaluation/accident_filter
 ```
 
 Test kiểm tra phân nhóm, giữ khóa/cột, không sửa Silver, chạy lại không nhân đôi output, input rỗng/thiếu cột, thứ tự pipeline và dừng khi lỗi.
 
-Kết quả đánh giá và giới hạn: [report.md](evaluation_v1_414/report.md). Luật vẫn có hai bài tai nạn bị bỏ sót ở nhóm uncertain; không tự sửa chúng thành accident trong luồng. Precision 100% trên bộ mẫu cũ không bảo đảm không có chọn nhầm ở bài mới. Output uncertain cần được xem xét; chưa có cơ chế lưu quyết định duyệt tay vào pipeline.
+Lệnh đánh giá cần file nhãn đã được kiểm duyệt do người dùng chuẩn bị. Schema đầu vào và cách sinh JSON: [rules_v1.md](rules_v1.md). Chưa có kết quả kiểm định độc lập trong repo. Output uncertain cần được xem xét; chưa có cơ chế lưu quyết định duyệt tay vào pipeline.
