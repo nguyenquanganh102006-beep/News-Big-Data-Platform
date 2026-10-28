@@ -7,7 +7,7 @@ import polars as pl
 from polars.testing import assert_frame_equal
 
 from filters.run import filter_frame, filter_silver_file
-from pipeline import run_pipeline
+from main import run_pipeline
 
 
 class FilterPipelineTests(unittest.TestCase):
@@ -34,15 +34,28 @@ class FilterPipelineTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             filter_frame(pl.DataFrame({"link": ["example"]}))
 
+    def test_steps_run_only_requested_stage_and_reject_invalid_step(self):
+        with patch("main.os.makedirs") as mkdir, patch("main.run_crawlers") as crawl, patch("main.run_preprocessors") as preprocess, patch("main.run_filters") as filtering:
+            for step, expected in ((0, (1, 1, 1)), (1, (1, 0, 0)), (2, (0, 1, 0)), (3, (0, 0, 1))):
+                with self.subTest(step=step):
+                    crawl.reset_mock()
+                    preprocess.reset_mock()
+                    filtering.reset_mock()
+                    run_pipeline(step=step)
+                    self.assertEqual((crawl.call_count, preprocess.call_count, filtering.call_count), expected)
+            self.assertEqual(mkdir.call_count, 16)
+            with self.assertRaises(ValueError):
+                run_pipeline(step=4)
+
     def test_pipeline_order_and_failure(self):
         order = []
-        with patch("pipeline.run_crawlers", side_effect=lambda: order.append("crawl")), patch("pipeline.run_preprocessors", side_effect=lambda: order.append("preprocess")), patch("pipeline.run_filters", side_effect=lambda: order.append("filter")):
+        with patch("main.run_crawlers", side_effect=lambda: order.append("crawl")), patch("main.run_preprocessors", side_effect=lambda: order.append("preprocess")), patch("main.run_filters", side_effect=lambda: order.append("filter")):
             run_pipeline()
             self.assertEqual(order, ["crawl", "preprocess", "filter"])
             order.clear()
-            run_pipeline(skip_crawl=True)
-            self.assertEqual(order, ["preprocess", "filter"])
-        with patch("pipeline.run_crawlers", side_effect=RuntimeError("failed")), patch("pipeline.run_filters") as filtering:
+            run_pipeline(step=2)
+            self.assertEqual(order, ["preprocess"])
+        with patch("main.run_crawlers", side_effect=RuntimeError("failed")), patch("main.run_filters") as filtering:
             with self.assertRaises(RuntimeError):
                 run_pipeline()
             filtering.assert_not_called()

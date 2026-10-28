@@ -20,24 +20,25 @@ New-Item -ItemType Directory -Force data/silver | Out-Null
 Chạy toàn bộ luồng:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pipeline
+.\.venv\Scripts\python.exe -m main
 ```
 
-Thứ tự: RSS → snapshot Bronze → preprocess + dedup batch/lịch sử → Silver tích lũy → phân loại → lưu output lọc. Nếu một bước lỗi, pipeline dừng; không chạy bước tiếp theo.
+Thứ tự: RSS → file Bronze → preprocess + dedup batch/lịch sử → Silver tích lũy → phân loại → lưu output lọc. Nếu một bước lỗi, pipeline dừng; không chạy bước tiếp theo.
 
-Đã có Bronze, không muốn crawl lại:
+Đã có Bronze, chạy preprocessors rồi filters:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pipeline --skip-crawl
+.\.venv\Scripts\python.exe -m main --step=2
+.\.venv\Scripts\python.exe -m main --step=3
 ```
 
-Chỉ lọc lại Silver hiện có:
+Chỉ lọc lại Silver hiện có (`--step=1` chỉ chạy crawler):
 
 ```powershell
-.\.venv\Scripts\python.exe -m filters.run
+.\.venv\Scripts\python.exe -m main --step=3
 ```
 
-Các lệnh cũ `python -m crawlers.run` và `python -m preprocessors.run` vẫn chỉ chạy từng bước riêng. Muốn tự động chạy bước lọc sau preprocessors, dùng `python -m pipeline`.
+Các lệnh cũ `python -m crawlers.run` và `python -m preprocessors.run` vẫn chỉ chạy từng bước riêng. Muốn tự động chạy bước lọc sau preprocessors, dùng `python -m main`.
 
 ## Đường dẫn và dữ liệu đầu ra
 
@@ -73,6 +74,8 @@ Output lọc là bản dựng lại từ Silver hiện tại, được thay th�
 Ghi file tạm rồi thay thế từng file sau khi ghi xong. Bốn file không được thay thế như một giao dịch duy nhất: nếu bị gián đoạn, chạy lại bước lọc để đồng bộ. Chỉ chạy một tiến trình ghi tại một thời điểm.
 
 ## Log và xử lý lỗi
+
+Log thống kê chỉ in khi `DEBUG=True`.
 
 ```text
 [Filter] source=vnexpress, input=86, accident=2, not_accident=78, uncertain=6

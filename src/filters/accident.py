@@ -1,24 +1,13 @@
 import html
 import re
 import unicodedata
-from dataclasses import dataclass
+from config import Decision
 
 from bs4 import BeautifulSoup
-
-VERSION = "rules-v1"
-
 
 def normalize(text: str | None) -> str:
     text = BeautifulSoup(html.unescape(text or ""), "html.parser").get_text(" ", strip=True)
     return re.sub(r"\s+", " ", unicodedata.normalize("NFC", text).lower()).strip()
-
-
-@dataclass(frozen=True)
-class Decision:
-    label: str
-    reason: str
-    evidence: str
-    version: str = VERSION
 
 
 def classify_accident(title: str | None, description: str | None = None) -> Decision:

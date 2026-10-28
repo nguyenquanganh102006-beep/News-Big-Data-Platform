@@ -1,8 +1,8 @@
 import polars as pl
 from config import DEBUG, RSS_SOURCES
-from config.storage import latest_bronze_path
-from .identity import add_article_identity
-from .dedup import update_silver_history
+from config import latest_bronze_path
+from .utils import dedup_add_article_identity
+from .utils import dedup_update_silver_history
 from .utils import (
     check_valid_characters, 
     convert_string_to_datetime_utc,
@@ -161,8 +161,8 @@ def _process_col_author(df: pl.DataFrame) -> pl.DataFrame:
 
 
 
-def rss_tuoitre_preprocessor(save_file=True) -> pl.DataFrame:
-    raw_path = latest_bronze_path("tuoitre")
+def rss_tuoitre_preprocessor(save_file=True, crawled_date: str | None = None) -> pl.DataFrame:
+    raw_path = latest_bronze_path("tuoitre", crawled_date)
     save_path = RSS_SOURCES["tuoitre"]["silver_save_path"]
     
     if not str(raw_path).endswith(".parquet"):
@@ -178,7 +178,7 @@ def rss_tuoitre_preprocessor(save_file=True) -> pl.DataFrame:
     if DEBUG:
         _check(df)
     
-    df = add_article_identity(df, "tuoitre")
+    df = dedup_add_article_identity(df, "tuoitre")
 
-    return update_silver_history(df, save_path, "tuoitre", save_file=save_file)
+    return dedup_update_silver_history(df, save_path, "tuoitre", save_file=save_file)
     

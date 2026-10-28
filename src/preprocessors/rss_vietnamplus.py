@@ -1,8 +1,8 @@
 import polars as pl
 from config import DEBUG, RSS_SOURCES
-from config.storage import latest_bronze_path
-from .identity import add_article_identity
-from .dedup import update_silver_history
+from config import latest_bronze_path
+from .utils import dedup_add_article_identity
+from .utils import dedup_update_silver_history
 from .utils import (
     check_valid_characters, 
     normalize_double_quotes,
@@ -236,8 +236,8 @@ def _process_col_updated(df: pl.DataFrame) -> pl.DataFrame:
 
 
 
-def rss_vietnamplus_preprocessor(save_file=True) -> pl.DataFrame:
-    raw_path = latest_bronze_path("vietnamplus")
+def rss_vietnamplus_preprocessor(save_file=True, crawled_date: str | None = None) -> pl.DataFrame:
+    raw_path = latest_bronze_path("vietnamplus", crawled_date)
     save_path = RSS_SOURCES["vietnamplus"]["silver_save_path"]
     
     if not str(raw_path).endswith(".parquet"):
@@ -256,7 +256,7 @@ def rss_vietnamplus_preprocessor(save_file=True) -> pl.DataFrame:
     if DEBUG:
         _check(df)
     
-    df = add_article_identity(df, "vietnamplus")
+    df = dedup_add_article_identity(df, "vietnamplus")
 
-    return update_silver_history(df, save_path, "vietnamplus", save_file=save_file)
+    return dedup_update_silver_history(df, save_path, "vietnamplus", save_file=save_file)
     

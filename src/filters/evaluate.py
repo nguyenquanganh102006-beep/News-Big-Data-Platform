@@ -4,7 +4,8 @@ from dataclasses import asdict
 import json
 from pathlib import Path
 
-from .accident import classify_accident, VERSION
+from .accident import classify_accident
+from config import DEBUG, VERSION, FILTER_LABELS
 
 
 def evaluate(samples):
@@ -26,7 +27,7 @@ def evaluate(samples):
         "precision_accident": precision, "recall_accident": recall,
         "f1_accident": 2 * precision * recall / (precision + recall) if precision + recall else 0,
         "true_positive": tp, "false_positive": fp, "false_negative_including_abstentions": fn,
-        "confusion_matrix_actual_to_predicted": {label: dict(Counter(r["prediction"]["label"] for r in predictions if r["label"] == label)) for label in ("accident", "not_accident", "uncertain")},
+        "confusion_matrix_actual_to_predicted": {label: dict(Counter(r["prediction"]["label"] for r in predictions if r["label"] == label)) for label in FILTER_LABELS},
         "errors": [r["sample_id"] for r in predictions if r["label"] != r["prediction"]["label"]],
     }
     return metrics, predictions
@@ -42,7 +43,8 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     (args.output / "metrics.json").write_text(json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8")
     (args.output / "predictions.jsonl").write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in predictions), encoding="utf-8")
-    print(json.dumps(metrics, ensure_ascii=False, indent=2))
+    if DEBUG:
+        print(json.dumps(metrics, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

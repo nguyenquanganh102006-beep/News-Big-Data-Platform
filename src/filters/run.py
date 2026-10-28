@@ -3,8 +3,7 @@ from tempfile import NamedTemporaryFile
 
 import polars as pl
 
-from config.crawlers import RSS_SOURCES
-from config.filters import FILTERED_DATA_DIR, FILTER_SOURCES
+from config import DEBUG, RSS_SOURCES, FILTERED_DATA_DIR, FILTER_SOURCES, FILTER_LABELS
 from .accident import classify_accident
 
 
@@ -35,7 +34,7 @@ def write_parquet_atomic(df: pl.DataFrame, path: Path) -> None:
 def filter_silver_file(input_path: Path, output_dir: Path) -> dict[str, int]:
     classified = filter_frame(pl.read_parquet(input_path))
     partitions = {label: classified.filter(pl.col("accident_label") == label)
-                  for label in ("accident", "not_accident", "uncertain")}
+                  for label in FILTER_LABELS}
     write_parquet_atomic(classified, output_dir / "classified.parquet")
     for label, frame in partitions.items():
         write_parquet_atomic(frame, output_dir / f"{label}.parquet")
@@ -51,7 +50,8 @@ def run_filters() -> None:
     for source in FILTER_SOURCES:
         counts = filter_silver_file(Path(RSS_SOURCES[source]["silver_save_path"]),
                                     Path(FILTERED_DATA_DIR) / source)
-        print(f"[Filter] source={source}, " + ", ".join(f"{key}={value}" for key, value in counts.items()))
+        if DEBUG:
+            print(f"[Filter] source={source}, " + ", ".join(f"{key}={value}" for key, value in counts.items()))
 
 
 if __name__ == "__main__":

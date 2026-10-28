@@ -2,13 +2,11 @@
 
 ## Luồng chính
 
-Đã tích hợp bộ lọc tai nạn `rules-v1` sau Silver dedup. Từ thư mục gốc:
+RSS → file Bronze theo lần crawl → preprocess/dedup → Silver tích lũy → lọc tai nạn vào `data/filtered/<source>/`.
 
-```powershell
-.\.venv\Scripts\python.exe -m pipeline
-```
+Điểm vào `src/main.py` nhận `--step` kiểu int: `0` (mặc định) chạy toàn bộ, `1` chạy crawlers, `2` chạy preprocessors, `3` chạy filters. Các thư mục dữ liệu được tạo trước khi chạy.
 
-Luồng: crawl RSS → Bronze theo từng lần crawl → preprocess/dedup → Silver tích lũy → lọc vào `data/filtered/<source>/`. Dùng `--skip-crawl` để dùng Bronze mới nhất; dùng `python -m filters.run` để chỉ lọc lại Silver. Hỗ trợ 3 nguồn đã có preprocessor. Chi tiết input/output, schema, cấu hình, xử lý lỗi và test: [hướng dẫn luồng lọc](details/accident_filter/pipeline.md).
+Chi tiết: [luồng lọc](details/accident_filter/pipeline.md).
 
 ## Tiêu chí và đánh giá bộ lọc tai nạn
 
@@ -26,20 +24,13 @@ News-Big-Data-Platform/
 |-- src/                # Source code of the program
     |-- config/             # Contains all the configs, schemas, global constants, ... of the program
     |-- crawlers/           # Crawlers
+    |-- preprocessors/      # Cleaning and dedup
+    |-- filters/            # Accident filtering
+    |-- main.py             # Main flow
 ```
 
 
 ## Partial flows
-
-Chạy trên Windows PowerShell từ thư mục gốc sau khi setup theo `docs/setup.md`:
-
-```powershell
-New-Item -ItemType Directory -Force data/bronze, data/silver, data/gold | Out-Null
-.\.venv\Scripts\python.exe -m crawlers.run
-.\.venv\Scripts\python.exe -m preprocessors.run
-```
-
-Chạy crawler trước để tạo dữ liệu Bronze đầu vào cho preprocessors. Lệnh dùng trực tiếp Python trong `.venv`, không cần kích hoạt môi trường ảo.
 
 ### 1. Config
 
@@ -88,12 +79,7 @@ python -m crawlers.run
 
 + Output: `data/bronze/<source>/YYYYMMDD_HHMMSS.parquet`.
 
-Mỗi lần chạy crawler tạo một snapshot riêng cho từng nguồn, timestamp theo giờ Việt Nam (UTC+7). Ví dụ: `data/bronze/vnexpress/20261024_153000.parquet`. Thư mục theo nguồn được tạo tự động. Nếu trùng timestamp, thêm hậu tố `_000001`, `_000002`, ... để không ghi đè file cũ. Các file Bronze cũ nằm trực tiếp trong `data/bronze/` được giữ nguyên.
-
-> [!NOTE]
-> Hỗ trợ Python >= 3.10. Khi dùng f-string có truy cập dictionary, dùng dấu nháy khác nhau cho chuỗi ngoài và key bên trong, ví dụ: `f"{source['bronze_save_path']}"`.
-
-
+Mỗi lần chạy crawler tạo một file riêng cho từng nguồn, timestamp theo giờ Việt Nam (UTC+7). Ví dụ: `data/bronze/vnexpress/20261024_153000.parquet`. Thư mục theo nguồn được tạo tự động. Nếu trùng timestamp, thêm hậu tố `_000001`, `_000002`, ... để không ghi đè file cũ. Các file Bronze cũ nằm trực tiếp trong `data/bronze/` được giữ nguyên.
 
 ### 3. Preprocessors
 
@@ -116,7 +102,7 @@ News-Big-Data-Platform/
         |-- run.py                  # Main file to run all the preprocessors
 ```
 
-+ Input: snapshot `.parquet` mới nhất theo tên timestamp trong `data/bronze/<source>/` (output của `crawlers`). Chạy crawler trước nếu chưa có snapshot. Silver được tích lũy sau khi loại trùng trong batch và so với lịch sử.
++ Input: file `.parquet` mới nhất theo tên timestamp trong `data/bronze/<source>/` (output của `crawlers`). Chạy crawler trước nếu chưa có file. Silver được tích lũy sau khi loại trùng trong batch và so với lịch sử.
 
 + Run pipeline
 ```bash
@@ -126,28 +112,10 @@ python -m preprocessors.run
 
 + Output: `.parquet` files saved in `data/silver/`
 
-Silver bổ sung `source`, `normalized_url` và `article_key`. Khóa là SHA-256 của `source + "\n" + normalized_url`, ổn định qua các lần crawl. Chuẩn hóa bỏ khoảng trắng ở hai đầu URL, fragment `#...`, chuyển scheme/host sang chữ thường và bỏ các tham số tracking trong `src/config/dedup.py` (không phân biệt hoa thường). Các query khác, thứ tự và encoding được giữ nguyên để tránh mất ID bài. Không gộp HTTP/HTTPS hoặc các URL khác path.
+Chi tiết làm sạch: [EDA preprocessors](details/preprocessor_eda.md). Cơ chế chọn file, chuẩn hóa URL và lưu lịch sử: [dedup preprocessors](details/preprocessor_dedup.md).
 
-URL thiếu hoặc không hợp lệ có `normalized_url` và `article_key` là null; bản ghi vẫn được giữ lại. Dedup không gộp các bản có khóa null.
+### 4. Filters
 
-Kiểm tra khóa nhận diện từ thư mục gốc:
-
-```powershell
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
-```
-
-### Silver history dedup
-
-Sau khi tạo khóa, loại trùng trong batch theo `article_key`, giữ bản xuất hiện cuối cùng và giữ thứ tự tương đối của các bản còn lại. Sau đó dùng Polars `anti join` với lịch sử `data/silver/<source>.parquet` để lấy bài mới, rồi lưu lịch sử cũ + bài mới. Nếu chưa có Silver thì toàn bộ batch được xem là mới. Silver cũ chưa có khóa được bổ sung khóa từ `link`. Bài đã có giữ nguyên dữ liệu cũ.
-
-Ghi vào file tạm rồi thay thế file đích sau khi ghi thành công. Chỉ chạy một tiến trình ghi cho mỗi nguồn tại một thời điểm. Hàm preprocessor trả về **các bài mới**; `save_file=False` chỉ tính kết quả, không ghi file.
-
-Thống kê luôn được in, kể cả khi `DEBUG=False`:
-
-```text
-[Silver] source=..., input=..., batch_duplicates=..., history_duplicates=..., new=..., silver_total=..., status=saved
-```
-
-`input` là số dòng trước dedup; `batch_duplicates` là số bản dư trong batch; `history_duplicates` là số bản sau batch dedup đã có trong lịch sử; `new` là số bài mới. Luôn có `input = batch_duplicates + history_duplicates + new`. `silver_total` là tổng sau gộp; `status=dry_run` là kết quả dự kiến, chưa ghi file.
-
-Chạy lại cùng batch có khóa hợp lệ cho `new=0`. Các bản khóa null vẫn được giữ và có thể lặp qua các lần chạy. Lịch sử bắt đầu từ Silver hiện có; chưa tự động nạp lại các snapshot Bronze cũ.
++ Input: Silver tích lũy của VnExpress, VietnamPlus, Tuổi Trẻ.
++ Hàm: `run_filters()` phân loại bằng `classify_accident()`.
++ Output: `classified.parquet`, `accident.parquet`, `not_accident.parquet`, `uncertain.parquet` trong `data/filtered/<source>/`.
