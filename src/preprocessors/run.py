@@ -3,10 +3,10 @@ from .rss_vietnamplus import rss_vietnamplus_preprocessor
 from .rss_tuoitre import rss_tuoitre_preprocessor
 
 
-def run_preprocessors():
-    rss_vnexpress_preprocessor(save_file=True)
-    rss_vietnamplus_preprocessor(save_file=True)
-    rss_tuoitre_preprocessor(save_file=True)
+def run_preprocessors(crawled_date: str | None = None):
+    rss_vnexpress_preprocessor(save_file=True, crawled_date=crawled_date)
+    rss_vietnamplus_preprocessor(save_file=True, crawled_date=crawled_date)
+    rss_tuoitre_preprocessor(save_file=True, crawled_date=crawled_date)
     
 
 

@@ -24,3 +24,7 @@ __all__ = [
     "remove_anchor_tag", "convert_string_to_datetime_utc", "convert_datetime_utc_to_iso_format", 
     "normalize_double_quotes", "extract_paragraph_tag_innertext", "capitalize_name",
 ]
+
+from .utils import dedup_normalize_article_url, dedup_make_article_key, dedup_add_article_identity, dedup_batch, dedup_new_articles_only, dedup_update_silver_history
+
+__all__ += ['dedup_normalize_article_url', 'dedup_make_article_key', 'dedup_add_article_identity', 'dedup_batch', 'dedup_new_articles_only', 'dedup_update_silver_history']

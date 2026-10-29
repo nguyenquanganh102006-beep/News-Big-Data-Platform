@@ -1,5 +1,8 @@
 import polars as pl
 from config import DEBUG, RSS_SOURCES
+from config import latest_bronze_path
+from .utils import dedup_add_article_identity
+from .utils import dedup_update_silver_history
 from .utils import (
     check_valid_characters, 
     extract_anchor_tag_href,
@@ -148,8 +151,8 @@ def _process_col_pub_date(df: pl.DataFrame) -> pl.DataFrame:
 
 
 
-def rss_vnexpress_preprocessor(save_file=True) -> pl.DataFrame:
-    raw_path = RSS_SOURCES["vnexpress"]["bronze_save_path"]
+def rss_vnexpress_preprocessor(save_file=True, crawled_date: str | None = None) -> pl.DataFrame:
+    raw_path = latest_bronze_path("vnexpress", crawled_date)
     save_path = RSS_SOURCES["vnexpress"]["silver_save_path"]
     
     if not str(raw_path).endswith(".parquet"):
@@ -165,8 +168,7 @@ def rss_vnexpress_preprocessor(save_file=True) -> pl.DataFrame:
     if DEBUG:
         _check(df)
     
-    if save_file:
-        df.write_parquet(save_path)
-    
-    return df
+    df = dedup_add_article_identity(df, "vnexpress")
+
+    return dedup_update_silver_history(df, save_path, "vnexpress", save_file=save_file)
     

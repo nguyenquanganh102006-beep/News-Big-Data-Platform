@@ -1,23 +1,8 @@
-import os
-from .rss_crawler import crawl_rss
-from config import DEBUG, RSS_SOURCES
+from .rss_crawler import crawl_rss_sources
 
 
 def run_crawlers() -> None:
-    for name, source in RSS_SOURCES.items():
-        df = crawl_rss(
-            rss_url=source["url"],
-            meta_keys=source["meta_keys"],
-            entry_keys=source["entry_keys"],
-            Model=source["schema"],
-            save_path=source["bronze_save_path"]
-        )
-        
-        if DEBUG:
-            print(f"[Info] Saved {name} df at: {source["bronze_save_path"]}")
-            print(f"[Info] {name}_df.head():")
-            print(df.head())
-    
+    crawl_rss_sources()
 
 
 if __name__ == "__main__":
