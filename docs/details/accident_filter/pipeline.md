@@ -2,7 +2,7 @@
 
 ## Mục đích và phạm vi
 
-Áp dụng nguyên bộ `rules-v1` đã chốt vào dữ liệu Silver tích lũy. Dùng `title` và câu đầu `description`, không tải thân bài, không thay đổi luật sau đánh giá. Mỗi dòng là một bài báo, không phải một vụ tai nạn độc lập. Chưa trích xuất province, district, vehicles, casualties và chưa tạo Gold nghiệp vụ.
+Áp dụng nguyên bộ `rules-v1` đã chốt vào dữ liệu Silver tích lũy. Dùng `title` và câu đầu `description`, không tải thân bài, không thay đổi luật sau đánh giá. Mỗi dòng là một bài báo, không phải một vụ tai nạn độc lập. Bước filter không trích xuất thông tin; bước tiếp theo được mô tả tại [task24 — trích xuất](../accident_extraction.md).
 
 Nguồn đang hỗ trợ: VnExpress, VietnamPlus, Tuổi Trẻ, tương ứng 3 preprocessor hiện có. Crawler vẫn lấy 7 nguồn nhưng 4 nguồn còn lại chưa có Silver nên chưa được lọc trong luồng này.
 

@@ -4,7 +4,7 @@
 
 RSS → file Bronze theo lần crawl → preprocess/dedup → Silver tích lũy → lọc tai nạn vào `data/filtered/<source>/`.
 
-Điểm vào `src/main.py` nhận `--step` kiểu int: `0` (mặc định) chạy toàn bộ, `1` chạy crawlers, `2` chạy preprocessors, `3` chạy filters. Các thư mục dữ liệu được tạo trước khi chạy.
+Điểm vào `src/main.py` nhận `--step` kiểu int: `0` (mặc định) chạy toàn bộ, `1` chạy crawlers, `2` chạy preprocessors, `3` chạy filters, `4` chạy extractors. Các thư mục dữ liệu được tạo trước khi chạy.
 
 Chi tiết: [luồng lọc](details/accident_filter/pipeline.md).
 
@@ -26,6 +26,7 @@ News-Big-Data-Platform/
     |-- crawlers/           # Crawlers
     |-- preprocessors/      # Cleaning and dedup
     |-- filters/            # Accident filtering
+    |-- extractors/         # Accident information extraction
     |-- main.py             # Main flow
 ```
 
@@ -43,14 +44,6 @@ News-Big-Data-Platform/
         |-- crawlers.py     # Crawler configs
         |-- ...
 ```
-
->[!NOTE]
-> Tất cả các config của cả cái dự án này đều phải để trong `src/config/`, ví dụ như biến lấy từ `.env`, global constants (biến dùng chung) giữa các luồng, ...  
-
->[!WARNING]
-> Sau này có thêm luồng nào thì nhớ sửa cái folder structure ở trên  
-> KHÔNG hardcode các biến somewhere bên ngoài cái `config/` này  
-
 
 
 ### 2. Crawler
@@ -119,3 +112,11 @@ Chi tiết làm sạch: [EDA preprocessors](details/preprocessor_eda.md). Cơ ch
 + Input: Silver tích lũy của VnExpress, VietnamPlus, Tuổi Trẻ.
 + Hàm: `run_filters()` phân loại bằng `classify_accident()`.
 + Output: `classified.parquet`, `accident.parquet`, `not_accident.parquet`, `uncertain.parquet` trong `data/filtered/<source>/`.
+
+### 5. Extractors
+
++ Input: `data/filtered/<source>/accident.parquet`, dùng toàn bộ `title` và `description`.
++ Hàm: `run_extractors()` gọi các bước trích xuất bằng luật, regex và từ điển.
++ Output: `data/gold/accidents/<source>.parquet`, thêm địa điểm, phương tiện, thương vong, loại sự cố và bằng chứng.
+
+Chi tiết: [trích xuất thông tin tai nạn](details/accident_extraction.md).
