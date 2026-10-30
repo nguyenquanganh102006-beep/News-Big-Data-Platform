@@ -120,3 +120,11 @@ Chi tiết làm sạch: [EDA preprocessors](details/preprocessor_eda.md). Cơ ch
 + Output: `data/gold/accidents/<source>.parquet`, thêm địa điểm, phương tiện, thương vong, loại sự cố và bằng chứng.
 
 Chi tiết: [trích xuất thông tin tai nạn](details/accident_extraction.md).
+
+### 6. Candidate event retrieval (3.1)
+
+Đã có `events.retrieve_candidates()` để lọc sự kiện cùng tỉnh trong cửa sổ
+thời gian (mặc định ±24 giờ). Hiện chạy độc lập bằng dữ liệu giả trong test,
+chưa thêm bước vào `main.py`, chưa đọc Gold hoặc kết nối database.
+
+Chi tiết hợp đồng dữ liệu, ví dụ và cách chạy test: [bộ lọc ứng viên 3.1](details/event_retrieval.md).
