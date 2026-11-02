@@ -13,11 +13,11 @@ Không cần API key hoặc dịch vụ LLM.
 
 ## Input và output
 
-Input: `data/filtered/<source>/accident.parquet`, ba nguồn theo `EXTRACT_SOURCES`.
+Input: `data/silver/filtered/<source>/accident.parquet`, ba nguồn theo `EXTRACT_SOURCES`.
 Đọc toàn bộ `title` và `description`, giải mã HTML entity và chuẩn hóa Unicode NFC.
 Không crawl thân bài; không sửa file đầu vào, không tự sửa nhãn của filter.
 
-Output: `data/gold/accidents/<source>.parquet`. Giữ nguyên các cột đầu vào và bổ sung:
+Output: `data/silver/accidents/<source>.parquet`. Giữ nguyên các cột đầu vào và bổ sung:
 
 | Cột | Ý nghĩa |
 |---|---|
@@ -52,7 +52,7 @@ Log chỉ in khi `DEBUG=True`.
 ## Giới hạn và kiểm tra
 
 Đây là baseline theo luật, chưa phải kết quả được kiểm định chất lượng. Regex chưa hiểu đầy đủ quan hệ ngữ nghĩa, đồng tham chiếu, mệnh đề lồng nhau, địa điểm quê quán/điều trị, số tổng và các nhóm giao nhau. Các mẫu khó hoặc viết địa danh không chuẩn vẫn có thể bị bỏ sót hoặc nhận nhầm. Chưa có phép chuẩn hóa địa giới theo ngày sự kiện và chưa đối chiếu đủ mọi tên quận/huyện/phường/xã bằng từ điển.
-Bài được filter chọn nhầm vẫn có thể xuất hiện trong Gold; `missing_incident_details` giúp nhận biết trường hợp cần xem xét, không thay thế việc duyệt nhãn.
+Bài được filter chọn nhầm vẫn có thể xuất hiện trong kết quả trích xuất tại Silver; `missing_incident_details` giúp nhận biết trường hợp cần xem xét, không thay thế việc duyệt nhãn.
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
