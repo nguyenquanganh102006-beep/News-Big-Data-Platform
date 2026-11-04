@@ -142,15 +142,108 @@ class EventDatabaseTests(unittest.TestCase):
         self.assertEqual(stats["needs_review"], 1)
         self.assertEqual(self.query("SELECT article_key FROM articles WHERE article_key NOT IN (SELECT article_key FROM event_articles)"), [("c",)])
 
-    def test_changed_input_keeps_previous_link_and_payload(self):
+    def test_changed_assigned_article_updates_event_without_creating_review_or_new_link(self):
         paths = self.inputs({"test": [row("a")]})
         self.run_import(paths)
-        before = self.query("SELECT event_id,total_fatalities FROM accident_events")
+        event_id = self.query("SELECT event_id FROM accident_events")[0][0]
         paths = self.inputs({"test": [row("a", fatalities=9)]})
-        self.assertEqual(self.run_import(paths)["changed_input"], 1)
-        self.assertEqual(self.query("SELECT event_id,total_fatalities FROM accident_events"), before)
+        stats = self.run_import(paths)
+        self.assertEqual(stats["updated_assigned"], 1)
+        self.assertEqual(stats["changed_input"], 0)
+        self.assertEqual(self.query("SELECT event_id,total_fatalities FROM accident_events"), [(event_id,9)])
+        self.assertEqual(self.query("SELECT fatalities FROM articles"), [(9,)])
+        self.assertEqual(self.query("SELECT count(*) FROM match_reviews"), [(0,)])
+        history = json.loads(self.query("SELECT previous_payload FROM article_revisions")[0][0])
+        self.assertEqual(history["fatalities"], 2)
+        self.assertEqual(self.query("SELECT count(*) FROM event_articles"), [(1,)])
+
+    def test_updated_field_beats_old_reports_even_when_publication_time_is_unchanged(self):
+        paths = self.inputs({"test": [row("a"), row("b")]})
+        self.run_import(paths)
+        event_id = self.query("SELECT event_id FROM accident_events")[0][0]
+        paths = self.inputs({"test": [row("a", fatalities=3), row("b")]})
+        self.run_import(paths)
+        self.assertEqual(self.query("SELECT event_id,total_fatalities,article_count FROM accident_events"), [(event_id,3,2)])
+        self.assertEqual(self.query("SELECT fatalities FROM articles ORDER BY article_key"), [(3,),(2,)])
+        replay = self.run_import(paths)
+        self.assertEqual(replay["updated_assigned"], 0)
+        self.assertEqual(replay["already_processed"], 2)
+        self.assertEqual(self.query("SELECT count(*) FROM article_revisions"), [(1,)])
+
+    def test_newer_article_supersedes_older_casualty_figure_without_summing(self):
+        self.run_import(self.inputs({"test": [row("a"), row("b", fatalities=3,
+                        pub_date="2026-11-04T13:00:00+07:00")]}))
+        self.assertEqual(self.query("SELECT total_fatalities,article_count FROM accident_events"), [(3,2)])
+
+    def test_description_only_change_does_not_make_older_casualty_number_newer(self):
+        self.run_import(self.inputs({"test": [row("a"), row("b", fatalities=3,
+                        pub_date="2026-11-04T13:00:00+07:00")]}))
+        stats = self.run_import(self.inputs({"test": [row("a", description="Tin bổ sung về xử lý giao thông.")]}))
+        self.assertEqual(stats["updated_assigned"], 1)
+        self.assertEqual(self.query("SELECT total_fatalities FROM accident_events"), [(3,)])
+
+    def test_missing_fields_do_not_erase_known_values_but_explicit_zero_replaces_them(self):
+        self.run_import(self.inputs({"test": [row("a")]}))
+        self.run_import(self.inputs({"test": [row("a", fatalities=None, province=None, pub_date=None)]}))
+        self.assertEqual(self.query("SELECT total_fatalities,province FROM accident_events"), [(2,"Hà Nội")])
+        self.run_import(self.inputs({"test": [row("a", fatalities=0)]}))
+        self.assertEqual(self.query("SELECT total_fatalities FROM accident_events"), [(0,)])
+        self.assertEqual(self.query("SELECT count(*) FROM article_revisions"), [(2,)])
+
+    def test_event_location_correction_is_visible_to_new_articles_in_same_batch(self):
+        self.run_import(self.inputs({"test": [row("a")]}))
+        event_id = self.query("SELECT event_id FROM accident_events")[0][0]
+        paths = self.inputs({"test": [row("b", province="Nghệ An", district="Vinh",
+                        pub_date="2026-11-04T11:30:00+07:00"), row("a", province="Nghệ An", district="Vinh")]})
+        stats = self.run_import(paths)
+        self.assertEqual((stats["updated_assigned"], stats["matched"]), (1,1))
+        self.assertEqual(self.query("SELECT event_id,province,article_count FROM accident_events"), [(event_id,"Nghệ An",2)])
+        self.assertIn("Nghệ An", self.query("SELECT location_full FROM accident_events")[0][0])
+
+    def test_existing_database_with_legacy_index_supports_automatic_updates(self):
+        self.run_import(self.inputs({"test": [row("a")]}))
+        with duckdb.connect(str(self.db)) as connection:
+            connection.execute("CREATE INDEX event_province_time ON accident_events(province,anchor_published_at)")
+        stats = self.run_import(self.inputs({"test": [row("a", province="Nghệ An", district="Vinh")]}))
+        self.assertEqual(stats["updated_assigned"],1)
+        self.assertEqual(self.query("SELECT province FROM accident_events"),[("Nghệ An",)])
+
+    def test_assigned_update_and_revision_history_roll_back_if_event_refresh_fails(self):
+        self.run_import(self.inputs({"test": [row("a")]}))
+        paths = self.inputs({"test": [row("a", fatalities=9)]})
+        with patch.object(EventRepository, "refresh_event", side_effect=RuntimeError("refresh failed")):
+            with self.assertRaisesRegex(RuntimeError,"refresh failed"):
+                self.run_import(paths)
         self.assertEqual(self.query("SELECT fatalities FROM articles"), [(2,)])
-        self.assertEqual(self.query("SELECT count(*) FROM match_reviews"), [(1,)])
+        self.assertEqual(self.query("SELECT total_fatalities FROM accident_events"), [(2,)])
+        self.assertEqual(self.query("SELECT count(*) FROM article_revisions"), [(0,)])
+
+    def test_legacy_changed_input_review_is_closed_when_assigned_update_is_applied(self):
+        self.run_import(self.inputs({"test": [row("a")]}))
+        updated = row("a", fatalities=4)
+        repository = EventRepository(self.db)
+        try:
+            repository.save_review(prepare_article(updated), {
+                "decision":"needs_review","reasons":["changed_input"],"scores":[]})
+        finally:
+            repository.close()
+        stats = self.run_import(self.inputs({"test": [updated]}))
+        self.assertEqual(stats["database"]["pending_reviews"],0)
+        self.assertEqual(self.query("SELECT status FROM match_reviews"), [("resolved",)])
+
+    def test_legacy_review_is_closed_if_current_gold_is_already_applied(self):
+        paths = self.inputs({"test": [row("a")]})
+        self.run_import(paths)
+        repository = EventRepository(self.db)
+        try:
+            repository.save_review(prepare_article(row("a")), {
+                "decision":"needs_review","reasons":["changed_input"],"scores":[]})
+        finally:
+            repository.close()
+        stats = self.run_import(paths)
+        self.assertEqual(stats["already_processed"],1)
+        self.assertEqual(stats["updated_assigned"],0)
+        self.assertEqual(stats["database"]["pending_reviews"],0)
 
     def test_enriched_unassigned_article_matches_existing_event_and_resolves_old_reviews(self):
         self.run_import(self.inputs({"test": [row("a"), row("b", province=None)]}))

@@ -148,8 +148,9 @@ python -m events.inspect
 
 Chạy lại giữ nguyên ID/liên kết đã lưu, không cộng trùng số bài hoặc thương vong.
 Bài chưa có sự kiện được cập nhật và xét lại khi Gold bổ sung thông tin; lý do
-chờ cũ được đóng và giữ làm lịch sử. Bài đã có sự kiện mà đầu vào thay đổi vẫn
-được đưa vào diện xem xét, không tự đổi liên kết.
+chờ cũ được đóng và giữ làm lịch sử. Bài đã có sự kiện mà Gold thay đổi được tự
+cập nhật, tính lại thông tin vụ và giữ cùng liên kết. Bản trước khi sửa được
+lưu trong `article_revisions`; không đưa vào hàng chờ chỉ vì `changed_input`.
 Một lần nhập lỗi thì hủy toàn bộ lần ghi đó. Chỉ chạy một tiến trình ghi database.
 
 Chi tiết: [bộ lọc ứng viên 3.1](details/event_retrieval.md) và

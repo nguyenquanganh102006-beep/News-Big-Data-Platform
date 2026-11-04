@@ -11,7 +11,7 @@ import duckdb
 from config import AGGREGATION_VERSION, MATCH_VERSION
 from .adapter import fingerprint, json_text
 from .aggregation import aggregate_members
-from .retrieval import retrieve_candidates
+from .retrieval import retrieve_candidates, utc_datetime
 
 
 EVENT_NAMESPACE = UUID("c456c993-f92c-45a2-8b93-6046b1b9d2b8")
@@ -51,7 +51,9 @@ CREATE TABLE IF NOT EXISTS accident_events (
     created_at TIMESTAMPTZ NOT NULL DEFAULT current_timestamp,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT current_timestamp
 );
-CREATE INDEX IF NOT EXISTS event_province_time ON accident_events(province, anchor_published_at);
+-- Updating indexed parent columns can trigger DuckDB's FK delete/insert
+-- limitation. Keep province mutable; retrieval still uses the same SQL filter.
+DROP INDEX IF EXISTS event_province_time;
 CREATE TABLE IF NOT EXISTS event_articles (
     article_key VARCHAR PRIMARY KEY REFERENCES articles(article_key),
     event_id VARCHAR NOT NULL REFERENCES accident_events(event_id),
@@ -71,6 +73,18 @@ CREATE TABLE IF NOT EXISTS match_reviews (
 CREATE TABLE IF NOT EXISTS event_runs (
     run_id VARCHAR PRIMARY KEY, summary JSON NOT NULL, config JSON NOT NULL,
     model_fingerprint VARCHAR NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT current_timestamp
+);
+CREATE TABLE IF NOT EXISTS article_updates (
+    article_key VARCHAR PRIMARY KEY REFERENCES articles(article_key),
+    field_timestamps JSON NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT current_timestamp
+);
+CREATE TABLE IF NOT EXISTS article_revisions (
+    revision_id VARCHAR PRIMARY KEY,
+    article_key VARCHAR NOT NULL REFERENCES articles(article_key),
+    previous_fingerprint VARCHAR NOT NULL, previous_payload JSON NOT NULL,
+    replacement_fingerprint VARCHAR NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT current_timestamp
 );
 CREATE OR REPLACE VIEW accident_event_summary AS
 SELECT e.*, (SELECT list(DISTINCT a.url ORDER BY a.url)
@@ -94,7 +108,16 @@ class EventRepository:
         self.connection.close()
 
     def initialize(self):
-        self.connection.execute(DDL)
+        # Finish schema migration before importing data. In DuckDB, dropping an
+        # old index and updating its referenced parent in the same transaction
+        # can still invoke the old index's delete/insert constraint checks.
+        self.connection.execute("BEGIN TRANSACTION")
+        try:
+            self.connection.execute(DDL)
+            self.connection.execute("COMMIT")
+        except BaseException:
+            self.connection.execute("ROLLBACK")
+            raise
 
     def _rows(self, query, parameters=None):
         cursor = self.connection.execute(query, parameters or [])
@@ -102,11 +125,15 @@ class EventRepository:
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
     def read_articles(self):
-        rows = self._rows("SELECT * FROM articles ORDER BY article_key")
+        rows = self._rows("SELECT a.*, u.field_timestamps FROM articles a "
+                          "LEFT JOIN article_updates u USING(article_key) ORDER BY article_key")
         for row in rows:
             row["vehicles"] = json.loads(row["vehicles"])
             row["flags"] = json.loads(row["flags"])
             row["text"] = f'{row["title"]}. {row["description"]}'.strip()
+            row["field_timestamps"] = {
+                field: utc_datetime(value) for field, value in json.loads(row["field_timestamps"] or "{}").items()
+            }
         return {row["article_key"]: row for row in rows}
 
     def insert_article(self, article):
@@ -114,19 +141,55 @@ class EventRepository:
             f"INSERT INTO articles ({', '.join(ARTICLE_COLUMNS)}) "
             f"VALUES ({', '.join('?' for _ in ARTICLE_COLUMNS)})", _article_values(article))
 
-    def update_unassigned_article(self, article):
+    def update_article(self, article, previous=None, only_unassigned=False):
+        from uuid import uuid4
+        from .aggregation import SUMMARY_FIELDS, has_field_conflict
+
+        previous = previous if previous is not None else self.read_articles().get(article["article_key"])
+        if previous is None:
+            raise ValueError(f"Cannot update missing article: {article['article_key']}")
+        now = self.connection.execute("SELECT current_timestamp").fetchone()[0]
+        timestamps = dict(previous.get("field_timestamps") or {})
+        for field in (*SUMMARY_FIELDS, "published_at", "url", "title", "description"):
+            if not article.get(field) and article.get(field) != 0 and not has_field_conflict(article, field):
+                # Missing information is not a correction. Retain the last known
+                # value; the original Gold payload and old version remain auditable.
+                article[field] = previous.get(field)
+            if field in SUMMARY_FIELDS and (article.get(field) != previous.get(field)
+                    or has_field_conflict(article, field) != has_field_conflict(previous, field)):
+                timestamps[field] = now
+        article["field_timestamps"] = timestamps
+        article["text"] = f'{article["title"]}. {article["description"]}'.strip()
         # Never delete/reinsert the parent row: reviews reference this key.
+        guard = (
+            "AND NOT EXISTS (SELECT 1 FROM event_articles l WHERE l.article_key=articles.article_key) "
+            "AND NOT EXISTS (SELECT 1 FROM accident_events e WHERE e.anchor_article_key=articles.article_key)"
+            if only_unassigned else ""
+        )
         updated = self.connection.execute(
             f"UPDATE articles SET {', '.join(column + '=?' for column in ARTICLE_COLUMNS[1:])} "
-            "WHERE article_key=? "
-            "AND NOT EXISTS (SELECT 1 FROM event_articles l WHERE l.article_key=articles.article_key) "
-            "AND NOT EXISTS (SELECT 1 FROM accident_events e WHERE e.anchor_article_key=articles.article_key)",
+            f"WHERE article_key=? {guard}",
             _article_values(article)[1:] + [article["article_key"]],
         ).fetchone()[0]
         # Use the affected count: UPDATE RETURNING hits DuckDB's FK rewrite
         # limitation even when the referenced article_key is left unchanged.
         if updated != 1:
             raise ValueError(f"Cannot update missing or already assigned article: {article['article_key']}")
+        self.connection.execute(
+            "INSERT INTO article_revisions (revision_id,article_key,previous_fingerprint,previous_payload,"
+            "replacement_fingerprint) VALUES (?, ?, ?, ?, ?)",
+            [str(uuid4()), article["article_key"], previous["input_fingerprint"],
+             previous.get("extraction_payload") or previous.get("payload"), article["input_fingerprint"]],
+        )
+        self.connection.execute(
+            "INSERT INTO article_updates (article_key,field_timestamps) VALUES (?, ?) "
+            "ON CONFLICT (article_key) DO UPDATE SET field_timestamps=excluded.field_timestamps, "
+            "updated_at=now()",
+            [article["article_key"], json_text(timestamps)],
+        )
+
+    def update_unassigned_article(self, article, previous=None):
+        self.update_article(article, previous=previous, only_unassigned=True)
 
     def resolve_reviews(self, article_key):
         # Keep old reasons/payloads for audit, but stop presenting them as open.
@@ -185,13 +248,17 @@ class EventRepository:
             "SELECT article_key FROM event_articles WHERE event_id = ? ORDER BY article_key", [event_id]
         ).fetchall()
         members = [articles[key] for (key,) in keys]
-        summary = aggregate_members(members)
+        province = self.connection.execute(
+            "SELECT province FROM accident_events WHERE event_id=?", [event_id]
+        ).fetchone()[0]
+        summary = aggregate_members(members, fallback_province=province)
         self.connection.execute(
-            "UPDATE accident_events SET first_published_at=?, last_published_at=?, district=?, ward=?, "
+            "UPDATE accident_events SET first_published_at=coalesce(?,first_published_at), "
+            "last_published_at=coalesce(?,last_published_at), province=coalesce(?,province), district=?, ward=?, "
             "location_full=?, vehicles_involved=?, total_fatalities=?, total_injuries=?, article_count=?, "
             "aggregation_evidence=?, review_reasons=?, aggregation_version=?, updated_at=current_timestamp "
             "WHERE event_id=?",
-            [summary["first_published_at"], summary["last_published_at"], summary["district"], summary["ward"],
+            [summary["first_published_at"], summary["last_published_at"], summary["province"], summary["district"], summary["ward"],
              summary["location_full"], json_text(summary["vehicles"]), summary["fatalities"], summary["injuries"],
              len(members), json_text(summary["evidence"]), json_text(summary["reasons"]),
              AGGREGATION_VERSION, event_id],
@@ -226,7 +293,8 @@ class EventRepository:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         tables = {"accident_events": "accident_event_summary", "articles": "article_event_summary",
-                  "event_articles": "event_articles", "match_reviews": "match_reviews"}
+                  "event_articles": "event_articles", "match_reviews": "match_reviews",
+                  "article_revisions": "article_revisions"}
         # Each file is replaced only after a complete write. DuckDB remains the
         # source of truth if export is interrupted; rerunning regenerates files.
         with TemporaryDirectory(dir=output_dir) as tmp:

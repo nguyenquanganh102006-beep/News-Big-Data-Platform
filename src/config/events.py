@@ -15,7 +15,7 @@ RETRIEVAL_EVENT_COLUMNS = ("event_id", "province", "anchor_published_at")
 EVENT_DATABASE_PATH = Path(DATA_GOLD_DIR) / "events" / "accident_events.duckdb"
 EVENT_EXPORT_DIR = EVENT_DATABASE_PATH.parent / "exports"
 MATCH_VERSION = "tfidf-rules-v1"
-AGGREGATION_VERSION = "consensus-v1"
+AGGREGATION_VERSION = "latest-field-v1"
 MATCH_WEIGHTS = {"text": 0.45, "location": 0.25, "vehicles": 0.20, "time": 0.10}
 
 

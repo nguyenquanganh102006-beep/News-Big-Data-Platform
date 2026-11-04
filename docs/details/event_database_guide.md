@@ -9,7 +9,7 @@ Trước đây hệ thống dừng ở danh sách **bài báo**. Bây giờ đã
 **sự kiện tai nạn**, mỗi sự kiện có một `event_id`. Các bài được xác định cùng
 nói về một vụ sẽ được liên kết vào cùng mã đó, trong khi bài nguồn vẫn được giữ.
 
-Các thay đổi được làm trên nhánh `task/32`, nối tiếp code 3.1 của `task/31`.
+Các thay đổi được làm trên nhánh `task/32-33`, nối tiếp code 3.1 của `task/31`.
 
 ## 2. Đã chạy dữ liệu thật được những gì?
 
@@ -54,6 +54,39 @@ Kết quả trên database có sẵn:
 Database đã được sao lưu trước thay đổi tại
 `data/backups/before_unassigned_update_20261104_230840/`.
 
+### Tự cập nhật theo bản Gold mới nhất
+
+Phần 3 hiện tự nhận thay đổi của cả bài **đã có sự kiện**. Khi chạy lại bước 5:
+
+1. Bài không thay đổi được bỏ qua.
+2. Bài có thông tin mới được cập nhật trong database, lưu bản cũ vào lịch sử.
+3. Nếu bài đã có sự kiện, giữ nguyên mã/liên kết đó và tính lại thông tin vụ.
+4. Nếu bài chưa có sự kiện, tìm và so khớp lại như bình thường.
+
+Không còn đưa bài vào hàng chờ chỉ vì `changed_input`. Những lý do thay đổi
+cũ được đóng khi bản Gold hiện tại đã được áp dụng.
+
+Ví dụ cùng một bài trước ghi 2 người tử vong, sau sửa thành 3: sự kiện tự đổi
+sang 3, không tạo thêm vụ và không cộng thành 5. Thông tin mới được ghi nhận
+theo từng trường: chỉ sửa mô tả hoặc bổ sung nhãn địa điểm không làm một con số
+thương vong cũ trở thành con số mới nhất.
+
+Với các bài khác nhau cùng vụ, ưu tiên thông tin có mốc cập nhật mới hơn; khi
+chưa có lần sửa nào thì so theo ngày đăng bài. Nếu hai nguồn cùng mốc thời gian
+nhưng số khác nhau hoặc nguồn mới nhất tự mâu thuẫn, trường đó vẫn là “chưa rõ”.
+Thông tin bị thiếu trong bản mới không tự xóa giá trị đã biết; số 0 được nêu rõ
+vẫn thay thế được số cũ. Các bằng chứng nguồn được giữ để đối chiếu.
+
+“Bản mới nhất” ở đây là Gold hiện tại được đem vào bước 5; hệ thống không tự
+biết một file Gold cũ mà người dùng phục hồi là bản cũ. Giới hạn cập nhật ở
+Silver vẫn được nêu trong mục 7.
+
+Đã chạy với database có sẵn sau sao lưu tại
+`data/backups/before_auto_updates_20261104_233510/`. Mã/liên kết của 4 sự kiện
+được giữ nguyên. Dữ liệu Gold thật lần này không thay đổi thêm nên không tạo
+bản sửa giả để thử trên dữ liệu thật; các trường hợp cập nhật thương vong và
+địa điểm được kiểm tra bằng test riêng.
+
 ## 3. Ba phần 3.1, 3.2, 3.3 làm gì?
 
 ### 3.1 — Tìm những vụ có thể liên quan
@@ -86,11 +119,13 @@ Database có bốn bảng dữ liệu chính:
 | `articles` | Từng bài báo và thông tin đã trích xuất |
 | `accident_events` | Từng vụ tai nạn và thông tin tổng hợp |
 | `event_articles` | Bài nào đang thuộc vụ nào, vì sao được gán |
-| `match_reviews` | Trường hợp thiếu, thay đổi hoặc khó quyết định cần xem xét |
+| `match_reviews` | Trường hợp thiếu hoặc khó quyết định cần xem xét |
 
 Ngoài ra có bảng ghi lại các lần chạy, phiên bản và hai bảng xem tổng hợp
 `accident_event_summary`, `article_event_summary`. Bảng xem sự kiện có danh sách
 URL bài nguồn; bảng xem bài có `event_id` nếu bài đã được gán.
+`article_revisions` giữ bản trước mỗi lần sửa; `article_updates` ghi mốc thay đổi
+của các trường để chọn đúng thông tin mới hơn khi tổng hợp.
 
 ## 4. Dữ liệu nằm ở đâu?
 
@@ -110,6 +145,7 @@ data/
             ├── articles.parquet           # Bài và event_id nếu đã được gán
             ├── event_articles.parquet     # Liên kết bài–vụ
             ├── match_reviews.parquet      # Các trường hợp cần xem xét
+            ├── article_revisions.parquet  # Bản cũ trước khi tự cập nhật
             └── manifest.json             # Số lượng bản ghi lúc xuất
 ```
 
@@ -159,17 +195,21 @@ file xuất từ dữ liệu đã lưu.
 
 ## 6. Những điểm đã kiểm tra và sửa
 
-- Đã chạy **99 kiểm tra tự động**, tất cả đều đạt, không cần đặt `PYTHONPATH`.
+- Đã chạy **108 kiểm tra tự động**, tất cả đều đạt, không cần đặt `PYTHONPATH`.
 - Hai bài khác nguồn nói cùng vụ được gom thành một sự kiện trong test.
 - Hai vụ có địa điểm khác nhau không bị gộp chỉ vì tiêu đề giống nhau.
 - Chạy lại không tạo thêm bản ghi trùng, giữ nguyên mã sự kiện đã lưu.
 - Bài chưa có sự kiện được cập nhật khi Gold bổ sung thông tin, rồi được tìm
   và so khớp lại. Nếu đã đủ thông tin thì gán vào vụ phù hợp hoặc tạo vụ mới.
+- Bài đã có sự kiện cũng tự cập nhật khi Gold thay đổi; thông tin vụ được tính
+  lại, giữ nguyên ID và liên kết, có lịch sử bản cũ. Nếu lỗi ghi thì cả nội dung,
+  lịch sử và thông tin vụ đều được khôi phục bằng cách hủy lần nhập.
 - Lý do chờ cũ được đóng khi xét lại; nếu bài vẫn thiếu thông tin thì chỉ lý do
   hiện tại còn chờ. Lịch sử không bị xóa.
 - Nhiều báo cùng ghi 2 người tử vong thì tổng vẫn là 2, không cộng thành 4.
-- Nếu các bài đưa số thương vong khác nhau, tổng để “chưa rõ”, giữ thông tin
-  từng bài để đối chiếu; không tự chọn số lớn nhất. Không coi thiếu số liệu là 0.
+- Nếu các bài đưa số thương vong khác nhau, chọn số có mốc cập nhật mới hơn.
+  Nếu mới ngang nhau mà mâu thuẫn thì để “chưa rõ”. Không tự chọn số lớn nhất
+  và không coi thiếu số liệu là 0.
 - Nếu lỗi giữa lúc nhập database, các thay đổi của cả lần nhập đó được hủy;
   dữ liệu đã lưu từ lần chạy thành công trước vẫn còn.
 - Đã sửa hàm đổi ngày giờ: giữ đúng múi giờ có sẵn trong RSS. Ví dụ 12:00 giờ
@@ -193,9 +233,8 @@ và có kế hoạch xử lý lại dữ liệu cũ; không xóa database để 
 - Chưa đo độ đúng bằng tập bài thật được con người đánh dấu cùng/khác vụ.
   Các sự kiện tự động vẫn có thể bị gộp nhầm hoặc tách nhầm.
 - Tin cập nhật trên cùng URL vẫn chịu cách lưu Silver hiện có: bản cũ được giữ.
-  Nếu Gold đã thay đổi, bài **chưa gán sự kiện** được cập nhật và xét lại. Với bài
-  **đã gán sự kiện**, phần sự kiện vẫn giữ dữ liệu/liên kết cũ và ghi nhận thay
-  đổi để xem xét; chưa tự chuyển bài sang vụ khác.
+  Khi thông tin đã xuống Gold, cả bài chưa gán và đã gán sự kiện đều được cập
+  nhật tự động. Bài đã gán giữ cùng sự kiện, chưa tự chuyển sang vụ khác.
 - Các file xuất được thay thế từng file. Nếu xuất bị gián đoạn sau khi database
   đã lưu thành công, chạy lại bước 5 để đồng bộ; database vẫn là dữ liệu chính.
 - Chưa có màn hình duyệt các bài chờ xem xét, bản đồ hoặc dashboard.

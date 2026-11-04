@@ -9,7 +9,7 @@ import polars as pl
 
 from config import (
     EXTRACT_OUTPUT_DIR, EXTRACT_SOURCES, EVENT_DATABASE_PATH, EVENT_EXPORT_DIR,
-    MATCH_WEIGHTS, MATCH_VERSION, MatchConfig,
+    MATCH_WEIGHTS, MATCH_VERSION, AGGREGATION_VERSION, MatchConfig,
 )
 from .adapter import REQUIRED_GOLD_COLUMNS, fingerprint, json_text, prepare_article
 from .matching import decide_match
@@ -55,30 +55,49 @@ def run_events(input_paths=None, database_path=None, export_dir=None, config=Non
     config_id = fingerprint(config_values)
     repo = EventRepository(database_path if database_path is not None else EVENT_DATABASE_PATH)
     stats = {"input": len(incoming), "new_event": 0, "matched": 0, "needs_review": 0,
-             "already_processed": 0, "changed_input": 0, "updated_unassigned": 0}
+             "already_processed": 0, "changed_input": 0, "updated_unassigned": 0,
+             "updated_assigned": 0, "refreshed_events": 0}
     try:
+        repo.initialize()
         repo.connection.execute("BEGIN TRANSACTION")
         try:
-            repo.initialize()
             stored = repo.read_articles()
-            linked = {key for (key,) in repo.connection.execute("SELECT article_key FROM event_articles").fetchall()}
+            linked = dict(repo.connection.execute("SELECT article_key,event_id FROM event_articles").fetchall())
+            updated_keys = set()
+            affected_events = {event_id for (event_id,) in repo.connection.execute(
+                "SELECT event_id FROM accident_events WHERE aggregation_version<>?", [AGGREGATION_VERSION]
+            ).fetchall()}
+            # Apply corrections first so retrieval for new articles sees the
+            # corrected event data, irrespective of source/publication order.
+            for article in incoming:
+                key = article["article_key"]
+                if key in linked and stored[key]["input_fingerprint"] != article["input_fingerprint"]:
+                    repo.update_article(article, previous=stored[key])
+                    stored[key] = article
+                    repo.resolve_reviews(key)
+                    updated_keys.add(key)
+                    affected_events.add(linked[key])
+                    stats["updated_assigned"] += 1
+            for event_id in sorted(affected_events):
+                repo.refresh_event(event_id, stored)
+            stats["refreshed_events"] = len(affected_events)
             effective = dict(stored)
             effective.update({a["article_key"] or ("unkeyed", a["input_fingerprint"]): a
-                              for a in incoming if a["article_key"] not in linked})
+                              for a in incoming})
             model = TextModel([a["text"] for a in effective.values()])
             for article in incoming:
                 key = article["article_key"]
+                if key in updated_keys:
+                    continue
                 if key in stored:
                     if stored[key]["input_fingerprint"] != article["input_fingerprint"]:
-                        if key in linked:
-                            repo.save_review(article, {"decision": "needs_review", "reasons": ["changed_input"], "scores": [],
-                                                       "config_fingerprint": config_id, "model_fingerprint": model.fingerprint})
-                            stats["changed_input"] += 1
-                            continue
-                        repo.update_unassigned_article(article)
+                        repo.update_unassigned_article(article, previous=stored[key])
                         stored[key] = article
                         stats["updated_unassigned"] += 1
                     if key in linked:
+                        # Any legacy changed_input review is obsolete once the
+                        # current Gold version is already applied to this link.
+                        repo.resolve_reviews(key)
                         stats["already_processed"] += 1
                         continue
                 elif key is not None:
@@ -95,7 +114,7 @@ def run_events(input_paths=None, database_path=None, export_dir=None, config=Non
                     repo.save_review(article, decision)
                 else:
                     event_id = repo.save_assignment(article, decision, config_id, model.fingerprint)
-                    linked.add(key)
+                    linked[key] = event_id
                     repo.refresh_event(event_id, stored)
             stats["database"] = repo.counts()
             repo.connection.execute(

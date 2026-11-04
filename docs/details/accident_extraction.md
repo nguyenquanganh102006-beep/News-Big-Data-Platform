@@ -118,8 +118,9 @@ Thay đổi này nằm ở cấu hình và code trích xuất **phần 2**, khô
 
 Sau đó phần 3 đã được bổ sung cách xét lại bài chưa có sự kiện. Khi chạy
 `python -m main --step=5`, thông tin mới từ Gold được cập nhật cho những bài
-này rồi đem đi tìm/so khớp sự kiện. Bài đã được gán sự kiện vẫn giữ dữ liệu và
-liên kết cũ nếu có thay đổi, đưa vào danh sách xem xét thay vì tự chuyển vụ.
+này rồi đem đi tìm/so khớp sự kiện. Bài đã được gán sự kiện vẫn giữ
+liên kết với cùng vụ; nếu Gold thay đổi, nội dung bài và thông tin vụ được cập
+nhật tự động, có lưu bản cũ để tra lại. Không còn chặn bằng `changed_input`.
 
 Đã chạy lại trên database có sẵn và giữ nguyên hai sự kiện cũ: thêm hai sự kiện
 ở Huế, Nghệ An; bài cầu Nhật Tân có tỉnh Hà Nội nhưng còn thiếu chi tiết tai nạn
