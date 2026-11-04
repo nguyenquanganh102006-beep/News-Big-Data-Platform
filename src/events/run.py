@@ -55,28 +55,37 @@ def run_events(input_paths=None, database_path=None, export_dir=None, config=Non
     config_id = fingerprint(config_values)
     repo = EventRepository(database_path if database_path is not None else EVENT_DATABASE_PATH)
     stats = {"input": len(incoming), "new_event": 0, "matched": 0, "needs_review": 0,
-             "already_processed": 0, "changed_input": 0}
+             "already_processed": 0, "changed_input": 0, "updated_unassigned": 0}
     try:
         repo.connection.execute("BEGIN TRANSACTION")
         try:
             repo.initialize()
             stored = repo.read_articles()
             linked = {key for (key,) in repo.connection.execute("SELECT article_key FROM event_articles").fetchall()}
-            model = TextModel([a["text"] for a in stored.values()] + [a["text"] for a in incoming])
+            effective = dict(stored)
+            effective.update({a["article_key"] or ("unkeyed", a["input_fingerprint"]): a
+                              for a in incoming if a["article_key"] not in linked})
+            model = TextModel([a["text"] for a in effective.values()])
             for article in incoming:
                 key = article["article_key"]
                 if key in stored:
                     if stored[key]["input_fingerprint"] != article["input_fingerprint"]:
-                        repo.save_review(article, {"decision": "needs_review", "reasons": ["changed_input"], "scores": [],
-                                                   "config_fingerprint": config_id, "model_fingerprint": model.fingerprint})
-                        stats["changed_input"] += 1
-                        continue
+                        if key in linked:
+                            repo.save_review(article, {"decision": "needs_review", "reasons": ["changed_input"], "scores": [],
+                                                       "config_fingerprint": config_id, "model_fingerprint": model.fingerprint})
+                            stats["changed_input"] += 1
+                            continue
+                        repo.update_unassigned_article(article)
+                        stored[key] = article
+                        stats["updated_unassigned"] += 1
                     if key in linked:
                         stats["already_processed"] += 1
                         continue
                 elif key is not None:
                     repo.insert_article(article)
                     stored[key] = article
+                if key is not None:
+                    repo.resolve_reviews(key)
                 candidates = [] if article["reasons"] else repo.find_candidates(article, config, stored)
                 decision = decide_match(article, candidates, model, config)
                 decision.update(config_fingerprint=config_id, model_fingerprint=model.fingerprint)
@@ -88,11 +97,6 @@ def run_events(input_paths=None, database_path=None, export_dir=None, config=Non
                     event_id = repo.save_assignment(article, decision, config_id, model.fingerprint)
                     linked.add(key)
                     repo.refresh_event(event_id, stored)
-                    # A previously ambiguous article may now be linked as new evidence arrives.
-                    repo.connection.execute(
-                        "UPDATE match_reviews SET status='resolved' WHERE article_key=? AND input_fingerprint=?",
-                        [key, article["input_fingerprint"]],
-                    )
             stats["database"] = repo.counts()
             repo.connection.execute(
                 "INSERT INTO event_runs (run_id, summary, config, model_fingerprint) VALUES (?, ?, ?, ?)",

@@ -116,8 +116,12 @@ kiểm chứng riêng bằng bước 4.
 Thay đổi này nằm ở cấu hình và code trích xuất **phần 2**, không sửa code trong
 `src/events/`. Gold vẫn có trường `province` như trước để phần 3 đọc.
 
-Lần kiểm tra này chưa nhập lại database sự kiện cũ. Database đang giữ bản bài
-trước khi bổ sung tỉnh; code phần 3 hiện đánh dấu xem xét khi bài đã lưu thay
-đổi, chưa tự cập nhật bài đó. Vì vậy chạy bước 5 trên database cũ không tự biến
-ba bài thành ba sự kiện mới. Cần xử lý lại có sao lưu khi muốn thay kết quả cũ;
-không xóa database tùy tiện để thử.
+Sau đó phần 3 đã được bổ sung cách xét lại bài chưa có sự kiện. Khi chạy
+`python -m main --step=5`, thông tin mới từ Gold được cập nhật cho những bài
+này rồi đem đi tìm/so khớp sự kiện. Bài đã được gán sự kiện vẫn giữ dữ liệu và
+liên kết cũ nếu có thay đổi, đưa vào danh sách xem xét thay vì tự chuyển vụ.
+
+Đã chạy lại trên database có sẵn và giữ nguyên hai sự kiện cũ: thêm hai sự kiện
+ở Huế, Nghệ An; bài cầu Nhật Tân có tỉnh Hà Nội nhưng còn thiếu chi tiết tai nạn
+nên vẫn chờ. Không cần xóa hoặc tạo lại database. Xem
+[kết quả cập nhật và bản sao lưu](event_database_guide.md).

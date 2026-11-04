@@ -13,7 +13,7 @@ Các thay đổi được làm trên nhánh `task/32`, nối tiếp code 3.1 c�
 
 ## 2. Đã chạy dữ liệu thật được những gì?
 
-Trong lần kiểm tra ngày **04/11/2026**:
+Trong lần kiểm tra ban đầu ngày **04/11/2026**:
 
 - Lấy được tổng cộng **410 bản tin RSS từ 7 nguồn** trong một lần crawl.
 - Ba nguồn có bước xử lý tiếp hiện nay là VnExpress, VietnamPlus, Tuổi Trẻ.
@@ -32,6 +32,27 @@ phải danh sách đã được con người kiểm duyệt đầy đủ.
 Trong 5 bài thật của lần chạy này chưa có cặp nào được gom vào cùng một vụ.
 Khả năng gom nhiều bài cùng vụ đã được kiểm tra bằng dữ liệu mẫu có kết quả
 biết trước; chưa thể lấy lần chạy thật nhỏ này để kết luận độ chính xác của việc gom.
+
+### Sau khi bổ sung tỉnh và chạy lại phần 3
+
+Bước trích xuất phần 2 đã đọc thêm nhãn tỉnh/thành ở đầu bài VnExpress.
+Phần 3 được sửa để bài **chưa có sự kiện** nhận thông tin mới từ Gold và được
+xét lại, thay vì bị chặn vì dữ liệu thay đổi.
+
+Kết quả trên database có sẵn:
+
+- Giữ nguyên hai sự kiện cũ và các liên kết đã có.
+- Cập nhật tỉnh cho cả ba bài VnExpress chưa được gán sự kiện.
+- Tạo thêm hai sự kiện ở **Huế** và **Nghệ An**.
+- Bài cầu Nhật Tân đã có tỉnh **Hà Nội** nhưng còn cờ thiếu chi tiết tai nạn,
+  nên tiếp tục chờ xem xét, chưa tự tạo vụ mới.
+- Database hiện có **5 bài, 4 sự kiện, 4 liên kết và 1 bài đang chờ**.
+- Sáu mục chờ cũ được đánh dấu đã xử lý, vẫn giữ để tra lịch sử. Bảng
+  `match_reviews` có bảy dòng lịch sử, trong đó chỉ một dòng còn `pending`.
+- Chạy lại lần nữa không tạo thêm vụ, liên kết hoặc mục chờ.
+
+Database đã được sao lưu trước thay đổi tại
+`data/backups/before_unassigned_update_20261104_230840/`.
 
 ## 3. Ba phần 3.1, 3.2, 3.3 làm gì?
 
@@ -138,10 +159,14 @@ file xuất từ dữ liệu đã lưu.
 
 ## 6. Những điểm đã kiểm tra và sửa
 
-- Đã chạy **81 kiểm tra tự động**, tất cả đều đạt, không cần đặt `PYTHONPATH`.
+- Đã chạy **99 kiểm tra tự động**, tất cả đều đạt, không cần đặt `PYTHONPATH`.
 - Hai bài khác nguồn nói cùng vụ được gom thành một sự kiện trong test.
 - Hai vụ có địa điểm khác nhau không bị gộp chỉ vì tiêu đề giống nhau.
 - Chạy lại không tạo thêm bản ghi trùng, giữ nguyên mã sự kiện đã lưu.
+- Bài chưa có sự kiện được cập nhật khi Gold bổ sung thông tin, rồi được tìm
+  và so khớp lại. Nếu đã đủ thông tin thì gán vào vụ phù hợp hoặc tạo vụ mới.
+- Lý do chờ cũ được đóng khi xét lại; nếu bài vẫn thiếu thông tin thì chỉ lý do
+  hiện tại còn chờ. Lịch sử không bị xóa.
 - Nhiều báo cùng ghi 2 người tử vong thì tổng vẫn là 2, không cộng thành 4.
 - Nếu các bài đưa số thương vong khác nhau, tổng để “chưa rõ”, giữ thông tin
   từng bài để đối chiếu; không tự chọn số lớn nhất. Không coi thiếu số liệu là 0.
@@ -168,8 +193,9 @@ và có kế hoạch xử lý lại dữ liệu cũ; không xóa database để 
 - Chưa đo độ đúng bằng tập bài thật được con người đánh dấu cùng/khác vụ.
   Các sự kiện tự động vẫn có thể bị gộp nhầm hoặc tách nhầm.
 - Tin cập nhật trên cùng URL vẫn chịu cách lưu Silver hiện có: bản cũ được giữ.
-  Nếu đầu vào Gold của một bài đã lưu thay đổi, phần sự kiện ghi nhận để xem xét,
-  chưa âm thầm thay nội dung hay chuyển bài sang vụ khác.
+  Nếu Gold đã thay đổi, bài **chưa gán sự kiện** được cập nhật và xét lại. Với bài
+  **đã gán sự kiện**, phần sự kiện vẫn giữ dữ liệu/liên kết cũ và ghi nhận thay
+  đổi để xem xét; chưa tự chuyển bài sang vụ khác.
 - Các file xuất được thay thế từng file. Nếu xuất bị gián đoạn sau khi database
   đã lưu thành công, chạy lại bước 5 để đồng bộ; database vẫn là dữ liệu chính.
 - Chưa có màn hình duyệt các bài chờ xem xét, bản đồ hoặc dashboard.

@@ -15,6 +15,15 @@ from .retrieval import retrieve_candidates
 
 
 EVENT_NAMESPACE = UUID("c456c993-f92c-45a2-8b93-6046b1b9d2b8")
+ARTICLE_COLUMNS = ("article_key", "source", "url", "title", "description", "published_at",
+                   "province", "district", "ward", "vehicles", "fatalities", "injuries",
+                   "flags", "extraction_payload", "input_fingerprint")
+
+
+def _article_values(article):
+    values = dict(article, vehicles=json_text(article["vehicles"]),
+                  flags=json_text(article["flags"]), extraction_payload=article["payload"])
+    return [values.get(column) for column in ARTICLE_COLUMNS]
 
 DDL = """
 CREATE TABLE IF NOT EXISTS event_schema (version INTEGER PRIMARY KEY CHECK (version = 1));
@@ -101,15 +110,30 @@ class EventRepository:
         return {row["article_key"]: row for row in rows}
 
     def insert_article(self, article):
-        columns = ("article_key", "source", "url", "title", "description", "published_at",
-                   "province", "district", "ward", "vehicles", "fatalities", "injuries",
-                   "flags", "extraction_payload", "input_fingerprint")
-        values = [article.get(c) for c in columns]
-        values[9] = json_text(article["vehicles"])
-        values[12] = json_text(article["flags"])
-        values[13] = article["payload"]
         self.connection.execute(
-            f"INSERT INTO articles ({', '.join(columns)}) VALUES ({', '.join('?' for _ in columns)})", values)
+            f"INSERT INTO articles ({', '.join(ARTICLE_COLUMNS)}) "
+            f"VALUES ({', '.join('?' for _ in ARTICLE_COLUMNS)})", _article_values(article))
+
+    def update_unassigned_article(self, article):
+        # Never delete/reinsert the parent row: reviews reference this key.
+        updated = self.connection.execute(
+            f"UPDATE articles SET {', '.join(column + '=?' for column in ARTICLE_COLUMNS[1:])} "
+            "WHERE article_key=? "
+            "AND NOT EXISTS (SELECT 1 FROM event_articles l WHERE l.article_key=articles.article_key) "
+            "AND NOT EXISTS (SELECT 1 FROM accident_events e WHERE e.anchor_article_key=articles.article_key)",
+            _article_values(article)[1:] + [article["article_key"]],
+        ).fetchone()[0]
+        # Use the affected count: UPDATE RETURNING hits DuckDB's FK rewrite
+        # limitation even when the referenced article_key is left unchanged.
+        if updated != 1:
+            raise ValueError(f"Cannot update missing or already assigned article: {article['article_key']}")
+
+    def resolve_reviews(self, article_key):
+        # Keep old reasons/payloads for audit, but stop presenting them as open.
+        self.connection.execute(
+            "UPDATE match_reviews SET status='resolved' WHERE article_key=? AND status='pending'",
+            [article_key],
+        )
 
     def find_candidates(self, article, config, articles):
         radius = timedelta(hours=config.radius_hours)
@@ -181,7 +205,7 @@ class EventRepository:
             "INSERT INTO match_reviews (review_id, article_key, source_reference, input_fingerprint, reasons, "
             "decision_details, input_payload, match_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT (review_id) DO UPDATE SET decision_details=excluded.decision_details, "
-            "source_reference=excluded.source_reference",
+            "source_reference=excluded.source_reference, status=excluded.status",
             [review_id, article["article_key"], article["reference"], article["input_fingerprint"],
              json_text(decision["reasons"]), json_text(decision), article["payload"], MATCH_VERSION],
         )

@@ -10,6 +10,7 @@ import duckdb
 import polars as pl
 
 from events.run import run_events
+from events.adapter import prepare_article
 from events.repository import EventRepository
 from events.inspect import show_database
 
@@ -150,6 +151,76 @@ class EventDatabaseTests(unittest.TestCase):
         self.assertEqual(self.query("SELECT event_id,total_fatalities FROM accident_events"), before)
         self.assertEqual(self.query("SELECT fatalities FROM articles"), [(2,)])
         self.assertEqual(self.query("SELECT count(*) FROM match_reviews"), [(1,)])
+
+    def test_enriched_unassigned_article_matches_existing_event_and_resolves_old_reviews(self):
+        self.run_import(self.inputs({"test": [row("a"), row("b", province=None)]}))
+        event_id = self.query("SELECT event_id FROM accident_events")[0][0]
+        updated = row("b")
+        # Reproduce the legacy changed_input review created before this fix.
+        repository = EventRepository(self.db)
+        try:
+            repository.save_review(prepare_article(updated), {
+                "decision": "needs_review", "reasons": ["changed_input"], "scores": [],
+            })
+        finally:
+            repository.close()
+        paths = self.inputs({"test": [row("a"), updated]})
+        stats = self.run_import(paths)
+        self.assertEqual((stats["already_processed"], stats["updated_unassigned"], stats["matched"]), (1, 1, 1))
+        self.assertEqual(stats["changed_input"], 0)
+        self.assertEqual(self.query("SELECT article_count FROM accident_events"), [(2,)])
+        self.assertEqual(self.query("SELECT event_id FROM event_articles WHERE article_key='b'"), [(event_id,)])
+        self.assertEqual(self.query("SELECT province FROM articles WHERE article_key='b'"), [("Hà Nội",)])
+        self.assertEqual(self.query("SELECT status FROM match_reviews ORDER BY review_id"), [("resolved",), ("resolved",)])
+        count = self.query("SELECT count(*) FROM match_reviews")
+        replay = self.run_import(paths)
+        self.assertEqual(replay["already_processed"], 2)
+        self.assertEqual(replay["updated_unassigned"], 0)
+        self.assertEqual(self.query("SELECT count(*) FROM match_reviews"), count)
+
+    def test_enriched_unassigned_article_can_create_new_event_without_changing_old_one(self):
+        missing = row("b", province=None, title="Xe tải va chạm xe máy tại Nghệ An")
+        self.run_import(self.inputs({"test": [row("a"), missing]}))
+        before = self.query("SELECT event_id,anchor_article_key,article_count,total_fatalities FROM accident_events")
+        stats = self.run_import(self.inputs({"test": [row("a"), {**missing, "province": "Nghệ An"}]}))
+        self.assertEqual((stats["updated_unassigned"], stats["new_event"]), (1, 1))
+        self.assertEqual(stats["database"]["accident_events"], 2)
+        self.assertEqual(stats["database"]["pending_reviews"], 0)
+        self.assertEqual(self.query("SELECT event_id,anchor_article_key,article_count,total_fatalities "
+                                    "FROM accident_events WHERE anchor_article_key='a'"), before)
+
+    def test_enriched_but_still_incomplete_article_keeps_only_current_reason_pending(self):
+        self.run_import(self.inputs({"test": [row("b", province=None)]}))
+        paths = self.inputs({"test": [row("b", review_reasons=["missing_incident_details"])]})
+        stats = self.run_import(paths)
+        self.assertEqual((stats["updated_unassigned"], stats["needs_review"]), (1, 1))
+        self.assertEqual(stats["database"]["pending_reviews"], 1)
+        self.assertEqual(self.query("SELECT province FROM articles"), [("Hà Nội",)])
+        self.assertEqual(self.query("SELECT reasons FROM match_reviews WHERE status='pending'"),
+                         [(json.dumps(["missing_incident_details"]),)])
+        self.assertEqual(self.run_import(paths)["database"], stats["database"])
+        self.assertEqual(self.query("SELECT count(*) FROM match_reviews WHERE status='resolved'"), [(1,)])
+
+    def test_failure_after_enrichment_rolls_back_article_update_and_review_resolution(self):
+        self.run_import(self.inputs({"test": [row("a"), row("b", province=None)]}))
+        before = self.query("SELECT article_key,province,input_fingerprint FROM articles ORDER BY article_key")
+        paths = self.inputs({"test": [row("a"), row("b")]})
+        with patch.object(EventRepository, "save_assignment", side_effect=RuntimeError("write failed")):
+            with self.assertRaisesRegex(RuntimeError, "write failed"):
+                self.run_import(paths)
+        self.assertEqual(self.query("SELECT article_key,province,input_fingerprint FROM articles ORDER BY article_key"), before)
+        self.assertEqual(self.query("SELECT status FROM match_reviews"), [("pending",)])
+        self.assertEqual(self.query("SELECT count(*) FROM event_articles"), [(1,)])
+
+    def test_repository_refuses_updating_already_assigned_article(self):
+        self.run_import(self.inputs({"test": [row("a")]}))
+        repository = EventRepository(self.db)
+        try:
+            with self.assertRaisesRegex(ValueError, "already assigned"):
+                repository.update_unassigned_article(prepare_article(row("a", fatalities=9)))
+        finally:
+            repository.close()
+        self.assertEqual(self.query("SELECT fatalities FROM articles"), [(2,)])
 
     def test_empty_gold_creates_queryable_empty_database_and_exports(self):
         stats = self.run_import(self.inputs({"test": []}))
