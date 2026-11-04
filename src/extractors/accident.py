@@ -19,7 +19,9 @@ from config import (
     FACT_NEGATION_PATTERN, HYPOTHETICAL_PATTERN, UPDATE_PATTERN, MULTI_EVENT_PATTERN, CasualtyMention,
     SCENE_PATTERN, SUBJECT_ALIASES, DISJOINT_GROUP_PATTERN, VICTIM_AGE_PATTERN,
     NEAR_MISS_PATTERN, DISJOINT_ROLE_PAIRS,
+    ArticleLocation, ARTICLE_LOCATION_SCHEMA, VNEXPRESS_EXTRACT_VERSION,
 )
+from .vnexpress import fetch_vnexpress_locations
 
 
 def clean_text(value: str | None) -> str:
@@ -264,16 +266,47 @@ def extract_accident(title: str | None, description: str | None = None) -> Accid
     return result
 
 
-def extract_frame(frame: pl.DataFrame) -> pl.DataFrame:
+def apply_article_location(result: AccidentExtraction, location: ArticleLocation) -> None:
+    result.extraction_version = VNEXPRESS_EXTRACT_VERSION
+    if location.status == "ok" and location.province in PROVINCE_ALIASES:
+        result.evidence["province_dateline"] = [location.text or location.province]
+        result.evidence["province_dateline_url"] = [location.url] if location.url else []
+        if "ambiguous_province" in result.review_reasons or (
+                result.province is not None and result.province != location.province):
+            result.province = None
+            result.review_reasons.append("conflicting_article_province")
+            if "missing_province" not in result.review_reasons:
+                result.review_reasons.append("missing_province")
+        else:
+            result.province = location.province
+            result.review_reasons = [reason for reason in result.review_reasons if reason != "missing_province"]
+    elif result.province is None:
+        result.review_reasons.append(f"article_location_{location.status}")
+    result.review_reasons = list(dict.fromkeys(result.review_reasons))
+
+
+def extract_frame(frame: pl.DataFrame, article_locations: list[ArticleLocation] | None = None) -> pl.DataFrame:
     if "title" not in frame.columns:
         raise ValueError("Extraction input must contain title")
+    if article_locations is not None and len(article_locations) != frame.height:
+        raise ValueError("article_locations must have one entry per input row")
     rows = []
-    for row in frame.iter_rows(named=True):
-        result = asdict(extract_accident(row["title"], row.get("description")))
+    for index, row in enumerate(frame.iter_rows(named=True)):
+        extraction = extract_accident(row["title"], row.get("description"))
+        if article_locations is not None:
+            apply_article_location(extraction, article_locations[index])
+        result = asdict(extraction)
         result["evidence_json"] = json.dumps(result.pop("evidence"), ensure_ascii=False)
         rows.append(result)
     extracted = pl.DataFrame(rows, schema=EXTRACT_SCHEMA)
-    return frame.with_columns(extracted.get_columns())
+    output = frame.with_columns(extracted.get_columns())
+    if article_locations is not None:
+        metadata = pl.DataFrame([
+            {"article_location_text": item.text, "article_location_status": item.status,
+             "article_location_url": item.url} for item in article_locations
+        ], schema=ARTICLE_LOCATION_SCHEMA)
+        output = output.with_columns(metadata.get_columns())
+    return output
 
 
 def extract_filtered_files() -> None:
@@ -284,7 +317,9 @@ def extract_filtered_files() -> None:
     output_dir = Path(EXTRACT_OUTPUT_DIR)
     output_dir.mkdir(parents=True, exist_ok=True)
     for source, path in inputs.items():
-        result = extract_frame(pl.read_parquet(path))
+        frame = pl.read_parquet(path)
+        locations = fetch_vnexpress_locations(frame) if source == "vnexpress" else None
+        result = extract_frame(frame, article_locations=locations)
         with NamedTemporaryFile(dir=output_dir, suffix=".parquet", delete=False) as temporary:
             temporary_path = Path(temporary.name)
         try:

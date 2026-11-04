@@ -8,14 +8,18 @@ Từ thư mục gốc, sau khi có kết quả filter:
 .\.venv\Scripts\python.exe -m main --step=4
 ```
 
-`--step=0` hoặc không truyền step chạy toàn bộ: crawler → preprocessors → filters → extractors.
+`--step=0` hoặc không truyền step chạy toàn bộ, gồm bước lưu sự kiện sau extractors.
 Không cần API key hoặc dịch vụ LLM.
 
 ## Input và output
 
 Input: `data/filtered/<source>/accident.parquet`, ba nguồn theo `EXTRACT_SOURCES`.
 Đọc toàn bộ `title` và `description`, giải mã HTML entity và chuẩn hóa Unicode NFC.
-Không crawl thân bài; không sửa file đầu vào, không tự sửa nhãn của filter.
+Riêng VnExpress, bước này mở URL của bài đã được filter chọn và đọc nhãn
+tỉnh/thành nằm đầu bài (`p.description span.location-stamp`). Ví dụ nhãn
+`TP Huế` được nhận diện là `Huế`. Không dùng toàn bộ thân bài để trích xuất thêm
+thương vong hay phương tiện trong thay đổi này. Không sửa file đầu vào, không
+tự sửa nhãn của filter. Chạy bước 4 cần mạng để mở các bài VnExpress.
 
 Output: `data/gold/accidents/<source>.parquet`. Giữ nguyên các cột đầu vào và bổ sung:
 
@@ -28,6 +32,9 @@ Output: `data/gold/accidents/<source>.parquet`. Giữ nguyên các cột đầu 
 | evidence_json | JSON chứa các đoạn khớp luật trong văn bản đã làm sạch |
 | review_reasons | Các trường thiếu, mâu thuẫn hoặc ngữ cảnh phủ định/giả định cần xem xét |
 | extraction_version | Phiên bản bộ luật trích xuất |
+| article_location_text | Riêng VnExpress: nhãn địa điểm đọc được từ đầu bài |
+| article_location_status | Riêng VnExpress: `ok`, `missing`, `unknown`, `ambiguous`, lỗi tải trang/URL… |
+| article_location_url | Riêng VnExpress: URL trang dùng làm bằng chứng địa điểm |
 
 Mỗi lần chạy dựng lại output từ toàn bộ input, ghi file tạm rồi thay thế từng file.
 Không gộp nhiều bài thành một vụ; không cộng thương vong giữa các bài.
@@ -38,8 +45,12 @@ Log chỉ in khi `DEBUG=True`.
 
 - `src/config/extractors.py`: schema, dataclass, từ điển, regex, cấu hình đường dẫn; export qua `config`.
 - `src/extractors/accident.py`: trích xuất một bài, xử lý DataFrame, đọc và ghi file.
+- `src/extractors/vnexpress.py`: mở bài VnExpress và đọc nhãn địa điểm đầu bài;
+  xử lý lỗi mạng, giới hạn thời gian/dung lượng, kiểm tra URL và redirect.
 - `src/extractors/run.py`: chỉ gọi hàm xử lý; package export qua `__init__.py`.
 - Phiên bản hiện tại: `rules-v2`.
+- Bài VnExpress được bổ sung nhãn địa điểm có phiên bản
+  `rules-v2+vnexpress-dateline-v1`. Các nguồn khác giữ cách trích xuất hiện tại.
 - Địa danh chỉ nhận khi có ngữ cảnh vị trí hoặc tiền tố tiêu đề. Xét ngữ cảnh ngay trước địa danh để loại tên đường/cao tốc, vẫn giữ “đường Nguyễn Trãi tại Hà Nội”. Loại một số mẫu nơi cư trú/bệnh viện; không suy ra tỉnh từ phường/xã, không nhận “xã” bên trong “thị xã”. Tên cấp dưới phải viết hoa hoặc là số.
 - Từ điển được mở rộng với tên tỉnh/thành và tên lịch sử thường gặp. Đây là từ vựng nhận diện văn bản, không phải danh mục hành chính có hiệu lực hoặc bảng ánh xạ địa giới. Ví dụ gặp “Hải Dương” thì giữ “Hải Dương”, không tự đổi sang tên khác.
 - Phương tiện xét từng lần xuất hiện: không lấy “ô tô” chung từ “ô tô tải”, nhưng vẫn giữ ô tô con khi đi cùng xe tải. Tách xe máy điện/xe đạp điện.
@@ -60,3 +71,53 @@ Bài được filter chọn nhầm vẫn có thể xuất hiện trong Gold; `mi
 
 Test chức năng bao gồm các lỗi phản ví dụ: phủ định nguyên nhân, ô tô con đi cùng xe tải, đếm vai trò nạn nhân, số bằng chữ/đảo thứ tự, tổng và thành phần, cập nhật tử vong, nơi cư trú/bệnh viện, địa điểm sau tên đường, cấp hành chính chồng nhau; cùng HTML/Unicode, input rỗng, bảo toàn input và chạy lại không nhân đôi.
 Cần một tập bài được người kiểm duyệt gán thông tin từng trường để đo chất lượng thực tế.
+
+## Bổ sung tỉnh/thành từ đầu bài VnExpress — phần 2
+
+Hàm trích xuất cơ bản và test vẫn có thể chạy chỉ bằng tiêu đề/mô tả. Khi chạy
+`python -m main --step=4`, riêng nguồn VnExpress được bổ sung dữ liệu từ trang bài:
+
+1. Lấy URL của bài đã được chọn ở bước lọc.
+2. Mở trang VnExpress, chỉ đọc nhãn tỉnh/thành ở đầu mô tả bài.
+3. Đối chiếu nhãn với từ điển tỉnh/thành hiện có. Không suy tỉnh từ tên cầu,
+   tuyến đường, nơi cư trú hoặc các địa danh xuất hiện ở phần khác của trang.
+4. Nếu RSS đang thiếu tỉnh và nhãn rõ ràng, điền `province`, bỏ cờ
+   `missing_province` và lưu nhãn/URL trong `evidence_json`.
+5. Nếu tỉnh từ RSS khác nhãn đầu bài hoặc RSS đã có nhiều tỉnh mơ hồ, giữ tỉnh
+   trống và ghi `conflicting_article_province`; không âm thầm chọn một bên.
+6. Nếu không mở được trang hoặc không đọc được nhãn, giữ kết quả từ RSS,
+   lưu trạng thái để biết nguyên nhân. Không đoán địa phương.
+
+Mỗi URL chỉ mở một lần trong một batch; có khoảng nghỉ một giây giữa các URL.
+Không tải trang của nguồn khác; chỉ dùng HTTPS và các URL/redirect thuộc
+`vnexpress.net` hoặc `www.vnexpress.net`.
+
+### Kết quả kiểm tra thực tế ngày 04/11/2026
+
+Đã sao lưu Gold cũ vào `data/backups/before_vnexpress_dateline_20261104_224943/`
+rồi chạy lại riêng bước 4. Ba bài trước đây thiếu tỉnh đã có kết quả:
+
+| Bài | Nhãn trên trang | Giá trị `province` trong Gold |
+|---|---|---|
+| Tai nạn liên hoàn trên đường Hồ Chí Minh, đoạn A Lưới | TP Huế | Huế |
+| Xe container tông người đi bộ thể dục | Nghệ An | Nghệ An |
+| Xe ben gây tai nạn liên hoàn trên cầu Nhật Tân | Hà Nội | Hà Nội |
+
+Kết quả nằm trong `data/gold/accidents/vnexpress.parquet`. Các thông tin khác
+vẫn có thể thiếu: bài cầu Nhật Tân còn cờ `missing_incident_details`; bổ sung
+tỉnh không có nghĩa tự xác nhận mọi trường đã đầy đủ.
+
+Đã thêm 13 test trong `tests/test_vnexpress_location.py`; toàn bộ 94 test đạt.
+Test mạng dùng trang mẫu và phản hồi giả để chạy ổn định; ba URL thật được chạy
+kiểm chứng riêng bằng bước 4.
+
+### Quan hệ với phần 3 và dữ liệu đã lưu
+
+Thay đổi này nằm ở cấu hình và code trích xuất **phần 2**, không sửa code trong
+`src/events/`. Gold vẫn có trường `province` như trước để phần 3 đọc.
+
+Lần kiểm tra này chưa nhập lại database sự kiện cũ. Database đang giữ bản bài
+trước khi bổ sung tỉnh; code phần 3 hiện đánh dấu xem xét khi bài đã lưu thay
+đổi, chưa tự cập nhật bài đó. Vì vậy chạy bước 5 trên database cũ không tự biến
+ba bài thành ba sự kiện mới. Cần xử lý lại có sao lưu khi muốn thay kết quả cũ;
+không xóa database tùy tiện để thử.

@@ -156,8 +156,10 @@ và có kế hoạch xử lý lại dữ liệu cũ; không xóa database để 
 
 ## 7. Điều còn hạn chế
 
-- Hiện chỉ đọc tiêu đề và mô tả RSS, chưa lấy toàn bộ nội dung bài. Thiếu địa
-  điểm ở đầu vào thì bài có thể nằm trong danh sách chờ dù là tai nạn thật.
+- Phần trích xuất hiện đọc tiêu đề và mô tả RSS; VnExpress được bổ sung nhãn
+  tỉnh/thành ở đầu trang bài trong phần 2. Chưa dùng toàn bộ thân bài để trích
+  xuất. Thiếu địa điểm ở đầu vào thì bài có thể chờ dù là tai nạn thật. Xem
+  [cập nhật VnExpress và lưu ý với database cũ](accident_extraction.md).
 - Mốc so sánh hiện là **ngày đăng bài**, chưa phải ngày tai nạn thực sự xảy ra.
   Trường `time_occurred` để trống khi chưa có bằng chứng, không điền ngày đăng thay thế.
   Bài về cùng vụ nhưng đăng muộn hơn cửa sổ 24 giờ có thể bị tách thành sự kiện mới.

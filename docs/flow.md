@@ -122,7 +122,10 @@ Chi tiết làm sạch: [EDA preprocessors](details/preprocessor_eda.md). Cơ ch
 
 + Input: `data/filtered/<source>/accident.parquet`, dùng toàn bộ `title` và `description`.
 + Hàm: `run_extractors()` gọi các bước trích xuất bằng luật, regex và từ điển.
+  Riêng VnExpress, mở bài đã được filter chọn để đọc nhãn tỉnh/thành ở đầu bài.
 + Output: `data/gold/accidents/<source>.parquet`, thêm địa điểm, phương tiện, thương vong, loại sự cố và bằng chứng.
+  Việc lấy nhãn địa điểm VnExpress thuộc phần 2; phần 3 nhận trường `province`
+  từ Gold, không tự tải trang hay trích xuất lại tỉnh.
 
 Chi tiết: [trích xuất thông tin tai nạn](details/accident_extraction.md).
 
