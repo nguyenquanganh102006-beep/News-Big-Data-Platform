@@ -79,8 +79,12 @@ def convert_string_to_datetime_utc(
     utc_hours: int = 0
 ) -> datetime:
     tz = timezone(timedelta(hours=utc_hours))
-    dt_utc = datetime.strptime(dt_str, format).replace(tzinfo=tz).astimezone(timezone.utc)
-    return dt_utc
+    parsed = datetime.strptime(dt_str, format)
+    # RSS timestamps already carry an offset. Only attach the source timezone
+    # for formats such as Tuoi Tre's local date, which have no offset.
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=tz)
+    return parsed.astimezone(timezone.utc)
 
 
 def convert_datetime_utc_to_iso_format(dt: datetime) -> str:

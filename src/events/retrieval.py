@@ -27,7 +27,8 @@ _PROVINCE_LOOKUP = {
 }
 
 
-def _normalize_province(value: object) -> str:
+def normalize_province(value: object) -> str:
+    """Resolve a known province spelling without inferring boundary changes."""
     if value is None or (isinstance(value, str) and not value.strip()):
         raise ValueError("missing")
     if not isinstance(value, str):
@@ -38,7 +39,8 @@ def _normalize_province(value: object) -> str:
     return canonical
 
 
-def _utc_datetime(value: object) -> datetime:
+def utc_datetime(value: object) -> datetime:
+    """Parse an explicitly zoned timestamp and preserve its absolute instant."""
     if value is None or (isinstance(value, str) and not value.strip()):
         raise ValueError("missing")
     if isinstance(value, str):
@@ -100,11 +102,11 @@ def retrieve_candidates(
         article_key = None
         reasons.append("article_key_missing_or_invalid")
     try:
-        province = _normalize_province(article.get("province"))
+        province = normalize_province(article.get("province"))
     except ValueError as error:
         reasons.append(f"province_{error}")
     try:
-        published_at = _utc_datetime(article.get("published_at"))
+        published_at = utc_datetime(article.get("published_at"))
     except ValueError as error:
         reasons.append(f"published_at_{error}")
     if reasons:
@@ -120,8 +122,8 @@ def retrieve_candidates(
             raise ValueError(f"Event catalog contains duplicate event_id: {event_id}")
         seen_ids.add(event_id)
         try:
-            event_province = _normalize_province(row["province"])
-            anchor = _utc_datetime(row["anchor_published_at"])
+            event_province = normalize_province(row["province"])
+            anchor = utc_datetime(row["anchor_published_at"])
         except ValueError as error:
             raise ValueError(f"Event {event_id}: invalid province/anchor_published_at ({error})") from None
         if event_province == province and abs(anchor - published_at) <= radius:

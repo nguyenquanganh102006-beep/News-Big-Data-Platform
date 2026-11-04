@@ -1,4 +1,4 @@
-# 3.1 — Bộ lọc ứng viên sự kiện bằng dữ liệu giả
+# 3.1 — Bộ lọc ứng viên sự kiện
 
 ## Phần đã thực hiện
 
@@ -6,8 +6,10 @@
 bảng sự kiện Polars, trả về các sự kiện cùng tỉnh/thành trong cửa sổ thời gian.
 Không cần crawler, file Gold, DuckDB hoặc phần 3.3 để chạy test.
 
-Đây là bước tìm ứng viên; chưa kết luận cùng vụ, gán bài vào event hay tạo event
-mới. Chưa tích hợp vào `main.py`; các lựa chọn `--step=0..4` giữ như hiện tại.
+Đây là bước tìm ứng viên; việc kết luận cùng vụ và lưu sự kiện thuộc 3.2–3.3.
+Hàm vẫn chạy độc lập với bảng giả trong test, đồng thời đã được dùng trong
+`python -m main --step=5` với bài Gold và sự kiện từ DuckDB. Xem
+[hướng dẫn chạy thật](event_database_guide.md).
 
 | File | Vai trò |
 |---|---|
@@ -60,20 +62,20 @@ cấu hình và schema trước; nếu bài cần review thì trả ngay, chưa 
 
 ## Chạy test
 
-Sau khi kích hoạt môi trường Python và cài dependencies của repo, từ thư mục gốc:
+Sau khi kích hoạt môi trường Python và chạy `python -m pip install -e .`,
+từ thư mục gốc (không cần `PYTHONPATH`):
 
 ```bash
 # Linux/macOS: chỉ test 3.1
-PYTHONPATH=src python -m unittest discover -s tests -p 'test_event_retrieval.py' -v
+python -m unittest discover -s tests -p 'test_event_retrieval.py' -v
 
 # Toàn bộ test
-PYTHONPATH=src python -m unittest discover -s tests -v
+python -m unittest discover -s tests -v
 ```
 
 PowerShell:
 
 ```powershell
-$env:PYTHONPATH = "src"
 python -m unittest discover -s tests -p "test_event_retrieval.py" -v
 ```
 
@@ -81,12 +83,12 @@ Test tự tạo bài/sự kiện giả, không tạo dữ liệu trong `data/`. 
 giờ, khác tỉnh, đổi bán kính, alias/Unicode, offset timezone, thứ tự ổn định,
 giữ nguyên đầu vào/schema, input rỗng, bài thiếu dữ liệu và kho sự kiện lỗi.
 
-Tại thời điểm bàn giao: 9/9 test của 3.1 và 54/54 test toàn repo đạt trên
+Tại thời điểm bàn giao riêng 3.1: 9/9 test của 3.1 và 54/54 test toàn repo đạt trên
 Python 3.12.3, Polars 2.1.0. Ví dụ Python dưới đây cũng đã được chạy kiểm tra.
 
 ## Ví dụ dùng trực tiếp
 
-Ví dụ Python dưới đây có thể chạy sau khi đặt `PYTHONPATH=src`:
+Ví dụ Python dưới đây có thể chạy bằng môi trường đã cài project:
 
 ```python
 import polars as pl
@@ -117,7 +119,7 @@ print(result.candidates["event_id"].to_list())     # ['E01']
 phải truy vấn database tối ưu. Test dữ liệu giả xác minh quy tắc, chưa chứng minh
 candidate recall trên bài báo thật hoặc độ đúng của các trường upstream.
 
-Khi nối Gold, adapter sẽ ánh xạ `pub_date` thành `published_at` và kiểm tra dữ
-liệu upstream. Khi làm 3.3, repository cung cấp sự kiện và có thể chuyển phép lọc
-sang truy vấn SQL với cùng quy tắc UTC/biên thời gian. 3.2 nhận danh sách ứng viên
-để chấm điểm và quyết định gộp; phần 3.1 hiện chưa lưu hay cập nhật sự kiện.
+Adapter hiện ánh xạ `pub_date` thành `published_at` và kiểm tra dữ liệu Gold.
+Repository 3.3 lọc trước theo tỉnh/thời gian bằng SQL, rồi gọi hàm 3.1 để giữ
+cùng quy tắc. 3.2 nhận danh sách ứng viên để chấm điểm và quyết định gộp;
+hàm 3.1 không tự lưu hay cập nhật sự kiện.
