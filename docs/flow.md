@@ -2,7 +2,7 @@
 
 ## Luồng chính
 
-RSS → file Bronze theo lần crawl → preprocess/dedup → Silver tích lũy → lọc tai nạn vào `data/filtered/<source>/`.
+RSS → file Bronze theo lần crawl → preprocess/dedup → Silver tích lũy → lọc tai nạn vào `data/silver/filtered/<source>/`.
 
 Điểm vào `src/main.py` nhận `--step` kiểu int: `0` (mặc định) chạy toàn bộ, `1` chạy crawlers, `2` chạy preprocessors, `3` chạy filters, `4` chạy extractors. Các thư mục dữ liệu được tạo trước khi chạy.
 
@@ -20,6 +20,8 @@ News-Big-Data-Platform/
 |-- data/               # Contains output data of the program
     |-- bronze/             # Raw data crawled from sources 
     |-- silver/             # Cleaning data
+        |-- filtered/       # Classified articles by source
+        |-- accidents/      # Extracted accident information by source
     |-- gold/               # Final data ready for business services
 |-- src/                # Source code of the program
     |-- config/             # Contains all the configs, schemas, global constants, ... of the program
@@ -111,12 +113,12 @@ Chi tiết làm sạch: [EDA preprocessors](details/preprocessor_eda.md). Cơ ch
 
 + Input: Silver tích lũy của VnExpress, VietnamPlus, Tuổi Trẻ.
 + Hàm: `run_filters()` phân loại bằng `classify_accident()`.
-+ Output: `classified.parquet`, `accident.parquet`, `not_accident.parquet`, `uncertain.parquet` trong `data/filtered/<source>/`.
++ Output: `classified.parquet`, `accident.parquet`, `not_accident.parquet`, `uncertain.parquet` trong `data/silver/filtered/<source>/`.
 
 ### 5. Extractors
 
-+ Input: `data/filtered/<source>/accident.parquet`, dùng toàn bộ `title` và `description`.
++ Input: `data/silver/filtered/<source>/accident.parquet`, dùng toàn bộ `title` và `description`.
 + Hàm: `run_extractors()` gọi các bước trích xuất bằng luật, regex và từ điển.
-+ Output: `data/gold/accidents/<source>.parquet`, thêm địa điểm, phương tiện, thương vong, loại sự cố và bằng chứng.
++ Output: `data/silver/accidents/<source>.parquet`, thêm địa điểm, phương tiện, thương vong, loại sự cố và bằng chứng.
 
 Chi tiết: [trích xuất thông tin tai nạn](details/accident_extraction.md).
