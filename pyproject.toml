@@ -12,6 +12,9 @@ dependencies = [
     "polars",
     "python-dotenv",
     "pydantic",
+    "duckdb>=1.1,<2",
+    "pytz",
+    "scikit-learn>=1.4,<2",
 ]
 
 [build-system]

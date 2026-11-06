@@ -2,9 +2,13 @@
 
 ## Luồng chính
 
-RSS → file Bronze theo lần crawl → preprocess/dedup → Silver tích lũy → lọc tai nạn vào `data/silver/filtered/<source>/`.
+RSS → Bronze → làm sạch/dedup → lọc và trích xuất thông tin → Silver theo bài → phần 3 gom sự kiện → Gold (DuckDB).
 
-Điểm vào `src/main.py` nhận `--step` kiểu int: `0` (mặc định) chạy toàn bộ, `1` chạy crawlers, `2` chạy preprocessors, `3` chạy filters, `4` chạy extractors. Các thư mục dữ liệu được tạo trước khi chạy.
+Điểm vào `src/main.py` nhận `--step` kiểu int: `0` (mặc định) chạy toàn bộ, `1` chạy crawlers, `2` chạy preprocessors, `3` chạy filters, `4` chạy extractors, `5` chạy phần sự kiện và lưu database. Các thư mục dữ liệu được tạo trước khi chạy.
+
+Sau `python -m pip install -e .`, chạy từ thư mục gốc bằng `python -m main`.
+Không cần đặt thêm `PYTHONPATH`. Hướng dẫn dễ đọc và kết quả chạy dữ liệu thật:
+[lưu sự kiện vào database](details/event_database_guide.md).
 
 Chi tiết: [luồng lọc](details/accident_filter/pipeline.md).
 
@@ -19,16 +23,17 @@ News-Big-Data-Platform/
 |-- docs/               # Documentations 
 |-- data/               # Contains output data of the program
     |-- bronze/             # Raw data crawled from sources 
-    |-- silver/             # Cleaning data
-        |-- filtered/       # Classified articles by source
-        |-- accidents/      # Extracted accident information by source
-    |-- gold/               # Final data ready for business services
+    |-- silver/             # Bài đã làm sạch
+        |-- filtered/       # Kết quả lọc theo nguồn
+        |-- accidents/      # Bài đã trích xuất, đầu vào phần 3
+    |-- gold/               # Database sự kiện và bản xuất từ database
 |-- src/                # Source code of the program
     |-- config/             # Contains all the configs, schemas, global constants, ... of the program
     |-- crawlers/           # Crawlers
     |-- preprocessors/      # Cleaning and dedup
     |-- filters/            # Accident filtering
     |-- extractors/         # Accident information extraction
+    |-- events/             # Candidate retrieval, matching and DuckDB storage
     |-- main.py             # Main flow
 ```
 
@@ -119,6 +124,40 @@ Chi tiết làm sạch: [EDA preprocessors](details/preprocessor_eda.md). Cơ ch
 
 + Input: `data/silver/filtered/<source>/accident.parquet`, dùng toàn bộ `title` và `description`.
 + Hàm: `run_extractors()` gọi các bước trích xuất bằng luật, regex và từ điển.
+  Riêng VnExpress, mở bài đã được filter chọn để đọc nhãn tỉnh/thành ở đầu bài.
 + Output: `data/silver/accidents/<source>.parquet`, thêm địa điểm, phương tiện, thương vong, loại sự cố và bằng chứng.
+  Việc lấy nhãn địa điểm VnExpress thuộc phần 2; phần 3 nhận trường `province`
+  từ Silver, không tự tải trang hay trích xuất lại tỉnh.
 
 Chi tiết: [trích xuất thông tin tai nạn](details/accident_extraction.md).
+
+### 6. Sự kiện tai nạn (3.1, 3.2, 3.3)
+
+Input: `data/silver/accidents/<source>.parquet` của ba nguồn hiện có. Đọc chung
+các nguồn, sắp bài theo ngày đăng rồi khóa bài. Kho sự kiện được đọc từ DuckDB;
+sự kiện vừa tạo được dùng ngay để so sánh bài tiếp theo.
+
+```bash
+python -m main --step=5
+python -m events.inspect
+```
+
+- 3.1 tìm cùng tỉnh trong khoảng ±24 giờ.
+- 3.2 so văn bản, địa điểm chi tiết, phương tiện và thời gian; gộp/tạo mới hoặc
+  giữ bài chờ xem xét nếu chưa đủ bằng chứng.
+- 3.3 lưu vào `data/gold/events/accident_events.duckdb`; xuất Parquet trong
+  `data/gold/events/exports/`.
+
+Chạy lại giữ nguyên ID/liên kết đã lưu, không cộng trùng số bài hoặc thương vong.
+Bài chưa có sự kiện được cập nhật và xét lại khi Silver bổ sung thông tin; lý do
+chờ cũ được đóng và giữ làm lịch sử. Bài đã có sự kiện mà Silver thay đổi được tự
+cập nhật, tính lại thông tin vụ và giữ cùng liên kết. Bản trước khi sửa được
+lưu trong `article_revisions`; không đưa vào hàng chờ chỉ vì `changed_input`.
+Một lần nhập lỗi thì hủy toàn bộ lần ghi đó. Chỉ chạy một tiến trình ghi database.
+
+`data/silver/<source>.parquet` là lịch sử bài đã làm sạch của preprocessor;
+`data/silver/accidents/<source>.parquet` là tập bài tai nạn đã trích xuất, đầu vào
+của phần 3. Gold chỉ được ghi bởi bước sự kiện, không chứa đầu vào bài báo thô.
+
+Chi tiết: [bộ lọc ứng viên 3.1](details/event_retrieval.md) và
+[hướng dẫn database](details/event_database_guide.md).
