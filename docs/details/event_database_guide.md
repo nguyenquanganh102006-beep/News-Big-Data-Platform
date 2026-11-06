@@ -5,6 +5,9 @@
 Hệ thống đã chạy từ bước lấy tin RSS đến bước lưu sự kiện vào DuckDB.
 DuckDB là database nằm trong một file trên máy, không cần cài một máy chủ riêng.
 
+Quy ước tầng dữ liệu: **Silver chứa bài báo đã xử lý, là đầu vào phần 3**;
+**Gold chứa database sự kiện và các bản xuất từ database**, là kết quả phần 3.
+
 Trước đây hệ thống dừng ở danh sách **bài báo**. Bây giờ đã có thêm danh sách
 **sự kiện tai nạn**, mỗi sự kiện có một `event_id`. Các bài được xác định cùng
 nói về một vụ sẽ được liên kết vào cùng mã đó, trong khi bài nguồn vẫn được giữ.
@@ -36,7 +39,7 @@ biết trước; chưa thể lấy lần chạy thật nhỏ này để kết lu
 ### Sau khi bổ sung tỉnh và chạy lại phần 3
 
 Bước trích xuất phần 2 đã đọc thêm nhãn tỉnh/thành ở đầu bài VnExpress.
-Phần 3 được sửa để bài **chưa có sự kiện** nhận thông tin mới từ Gold và được
+Phần 3 được sửa để bài **chưa có sự kiện** nhận thông tin mới từ Silver và được
 xét lại, thay vì bị chặn vì dữ liệu thay đổi.
 
 Kết quả trên database có sẵn:
@@ -54,7 +57,7 @@ Kết quả trên database có sẵn:
 Database đã được sao lưu trước thay đổi tại
 `data/backups/before_unassigned_update_20261104_230840/`.
 
-### Tự cập nhật theo bản Gold mới nhất
+### Tự cập nhật theo bản Silver mới nhất
 
 Phần 3 hiện tự nhận thay đổi của cả bài **đã có sự kiện**. Khi chạy lại bước 5:
 
@@ -64,7 +67,7 @@ Phần 3 hiện tự nhận thay đổi của cả bài **đã có sự kiện**
 4. Nếu bài chưa có sự kiện, tìm và so khớp lại như bình thường.
 
 Không còn đưa bài vào hàng chờ chỉ vì `changed_input`. Những lý do thay đổi
-cũ được đóng khi bản Gold hiện tại đã được áp dụng.
+cũ được đóng khi bản Silver hiện tại đã được áp dụng.
 
 Ví dụ cùng một bài trước ghi 2 người tử vong, sau sửa thành 3: sự kiện tự đổi
 sang 3, không tạo thêm vụ và không cộng thành 5. Thông tin mới được ghi nhận
@@ -77,13 +80,13 @@ nhưng số khác nhau hoặc nguồn mới nhất tự mâu thuẫn, trường 
 Thông tin bị thiếu trong bản mới không tự xóa giá trị đã biết; số 0 được nêu rõ
 vẫn thay thế được số cũ. Các bằng chứng nguồn được giữ để đối chiếu.
 
-“Bản mới nhất” ở đây là Gold hiện tại được đem vào bước 5; hệ thống không tự
-biết một file Gold cũ mà người dùng phục hồi là bản cũ. Giới hạn cập nhật ở
-Silver vẫn được nêu trong mục 7.
+“Bản mới nhất” ở đây là bài đã trích xuất trong `data/silver/accidents/` được
+đem vào bước 5; hệ thống không tự biết một file cũ mà người dùng phục hồi là
+bản cũ. Giới hạn cập nhật ở Silver làm sạch vẫn được nêu trong mục 7.
 
 Đã chạy với database có sẵn sau sao lưu tại
 `data/backups/before_auto_updates_20261104_233510/`. Mã/liên kết của 4 sự kiện
-được giữ nguyên. Dữ liệu Gold thật lần này không thay đổi thêm nên không tạo
+được giữ nguyên. Dữ liệu Silver thật lần này không thay đổi thêm nên không tạo
 bản sửa giả để thử trên dữ liệu thật; các trường hợp cập nhật thương vong và
 địa điểm được kiểm tra bằng test riêng.
 
@@ -134,10 +137,11 @@ Tất cả đường dẫn sau tính từ thư mục gốc repo:
 ```text
 data/
 ├── bronze/<nguồn>/<thời điểm>.parquet       # Tin RSS vừa lấy
-├── silver/<nguồn>.parquet                  # Bài đã làm sạch
+├── silver/
+│   ├── <nguồn>.parquet                    # Lịch sử bài đã làm sạch
+│   └── accidents/<nguồn>.parquet          # Phần 2: bài đã trích xuất, đầu vào phần 3
 ├── filtered/<nguồn>/                       # Kết quả lọc tai nạn
 └── gold/
-    ├── accidents/<nguồn>.parquet           # Thông tin theo từng bài
     └── events/
         ├── accident_events.duckdb          # Database chính
         └── exports/
@@ -153,6 +157,25 @@ File cần giữ nếu muốn mở lại database là **`data/gold/events/accide
 Các file Parquet trong `exports/` là bản xuất thêm, không thay thế database chính.
 Thư mục `data/` được Git bỏ qua, nên dữ liệu nằm trên máy này, không tự đi theo
 code khi push hoặc clone repo trên máy khác.
+
+Trong thư mục xuất, `articles.parquet` là bản xem bảng bài nguồn đã nhập vào
+database sự kiện, có `event_id` khi đã gán; đây không phải đầu vào phần 3.
+
+### Chuyển từ bố cục cũ
+
+Từ cập nhật ngày 06/11/2026, bước 4 ghi bài vào
+`data/silver/accidents/<nguồn>.parquet`; bước 5 chỉ đọc đường dẫn Silver này.
+Database vẫn nằm ở `data/gold/events/accident_events.duckdb`.
+
+Với dữ liệu cũ ở `data/gold/accidents/`, sao lưu trước rồi chuyển nguyên các
+file bài sang `data/silver/accidents/`; không sửa nội dung bài và không xóa
+database. Hoặc chạy lại bước 4 để tạo đầu vào Silver từ kết quả lọc đang có
+(cần mạng để đọc nhãn địa điểm VnExpress). Nếu thiếu Silver, bước 5 báo rõ cần
+chạy bước 4; không âm thầm đọc lại dữ liệu trong Gold cũ.
+
+Đã chuyển dữ liệu hiện có và chạy lại bước 5: vẫn có 5 bài, 4 sự kiện, 1 bài
+chờ; các mã sự kiện và nội dung bài không đổi. Bản sao database cùng thư mục
+bài cũ được giữ ở `data/backups/before_silver_event_input_20261106_203039/`.
 
 ## 5. Cách chạy
 
@@ -185,7 +208,7 @@ Dùng đúng môi trường vừa cài thì không cần đặt `PYTHONPATH`.
 | Muốn làm gì? | Lệnh |
 |---|---|
 | Lấy tin và chạy toàn bộ đến database | `python -m main` |
-| Đã có Gold, chỉ chạy phần sự kiện | `python -m main --step=5` |
+| Đã có bài trích xuất trong Silver, chỉ chạy phần sự kiện | `python -m main --step=5` |
 | Xem nhanh số bài, số vụ và nội dung vụ | `python -m events.inspect` |
 | Chạy bộ kiểm tra tự động | `python -m unittest discover -s tests -v` |
 
@@ -195,13 +218,13 @@ file xuất từ dữ liệu đã lưu.
 
 ## 6. Những điểm đã kiểm tra và sửa
 
-- Đã chạy **108 kiểm tra tự động**, tất cả đều đạt, không cần đặt `PYTHONPATH`.
+- Đã chạy **111 kiểm tra tự động**, tất cả đều đạt, không cần đặt `PYTHONPATH`.
 - Hai bài khác nguồn nói cùng vụ được gom thành một sự kiện trong test.
 - Hai vụ có địa điểm khác nhau không bị gộp chỉ vì tiêu đề giống nhau.
 - Chạy lại không tạo thêm bản ghi trùng, giữ nguyên mã sự kiện đã lưu.
-- Bài chưa có sự kiện được cập nhật khi Gold bổ sung thông tin, rồi được tìm
+- Bài chưa có sự kiện được cập nhật khi Silver bổ sung thông tin, rồi được tìm
   và so khớp lại. Nếu đã đủ thông tin thì gán vào vụ phù hợp hoặc tạo vụ mới.
-- Bài đã có sự kiện cũng tự cập nhật khi Gold thay đổi; thông tin vụ được tính
+- Bài đã có sự kiện cũng tự cập nhật khi Silver thay đổi; thông tin vụ được tính
   lại, giữ nguyên ID và liên kết, có lịch sử bản cũ. Nếu lỗi ghi thì cả nội dung,
   lịch sử và thông tin vụ đều được khôi phục bằng cách hủy lần nhập.
 - Lý do chờ cũ được đóng khi xét lại; nếu bài vẫn thiếu thông tin thì chỉ lý do
@@ -232,8 +255,9 @@ và có kế hoạch xử lý lại dữ liệu cũ; không xóa database để 
   đang dùng quận/huyện và phường/xã khi có.
 - Chưa đo độ đúng bằng tập bài thật được con người đánh dấu cùng/khác vụ.
   Các sự kiện tự động vẫn có thể bị gộp nhầm hoặc tách nhầm.
-- Tin cập nhật trên cùng URL vẫn chịu cách lưu Silver hiện có: bản cũ được giữ.
-  Khi thông tin đã xuống Gold, cả bài chưa gán và đã gán sự kiện đều được cập
+- Tin cập nhật trên cùng URL vẫn chịu cách lưu lịch sử bài làm sạch tại
+  `data/silver/<nguồn>.parquet`: bản cũ được giữ. Khi thông tin mới đã có trong
+  `data/silver/accidents/`, cả bài chưa gán và đã gán sự kiện đều được cập
   nhật tự động. Bài đã gán giữ cùng sự kiện, chưa tự chuyển sang vụ khác.
 - Các file xuất được thay thế từng file. Nếu xuất bị gián đoạn sau khi database
   đã lưu thành công, chạy lại bước 5 để đồng bộ; database vẫn là dữ liệu chính.

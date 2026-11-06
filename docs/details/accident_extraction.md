@@ -21,7 +21,7 @@ tỉnh/thành nằm đầu bài (`p.description span.location-stamp`). Ví dụ 
 thương vong hay phương tiện trong thay đổi này. Không sửa file đầu vào, không
 tự sửa nhãn của filter. Chạy bước 4 cần mạng để mở các bài VnExpress.
 
-Output: `data/gold/accidents/<source>.parquet`. Giữ nguyên các cột đầu vào và bổ sung:
+Output: `data/silver/accidents/<source>.parquet`. Giữ nguyên các cột đầu vào và bổ sung:
 
 | Cột | Ý nghĩa |
 |---|---|
@@ -63,7 +63,7 @@ Log chỉ in khi `DEBUG=True`.
 ## Giới hạn và kiểm tra
 
 Đây là baseline theo luật, chưa phải kết quả được kiểm định chất lượng. Regex chưa hiểu đầy đủ quan hệ ngữ nghĩa, đồng tham chiếu, mệnh đề lồng nhau, địa điểm quê quán/điều trị, số tổng và các nhóm giao nhau. Các mẫu khó hoặc viết địa danh không chuẩn vẫn có thể bị bỏ sót hoặc nhận nhầm. Chưa có phép chuẩn hóa địa giới theo ngày sự kiện và chưa đối chiếu đủ mọi tên quận/huyện/phường/xã bằng từ điển.
-Bài được filter chọn nhầm vẫn có thể xuất hiện trong Gold; `missing_incident_details` giúp nhận biết trường hợp cần xem xét, không thay thế việc duyệt nhãn.
+Bài được filter chọn nhầm vẫn có thể xuất hiện trong Silver; `missing_incident_details` giúp nhận biết trường hợp cần xem xét, không thay thế việc duyệt nhãn.
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
@@ -94,16 +94,17 @@ Không tải trang của nguồn khác; chỉ dùng HTTPS và các URL/redirect 
 
 ### Kết quả kiểm tra thực tế ngày 04/11/2026
 
-Đã sao lưu Gold cũ vào `data/backups/before_vnexpress_dateline_20261104_224943/`
+Đã sao lưu bài trích xuất cũ (lúc đó nằm trong `data/gold/accidents/`) vào
+`data/backups/before_vnexpress_dateline_20261104_224943/`
 rồi chạy lại riêng bước 4. Ba bài trước đây thiếu tỉnh đã có kết quả:
 
-| Bài | Nhãn trên trang | Giá trị `province` trong Gold |
+| Bài | Nhãn trên trang | Giá trị `province` trong Silver |
 |---|---|---|
 | Tai nạn liên hoàn trên đường Hồ Chí Minh, đoạn A Lưới | TP Huế | Huế |
 | Xe container tông người đi bộ thể dục | Nghệ An | Nghệ An |
 | Xe ben gây tai nạn liên hoàn trên cầu Nhật Tân | Hà Nội | Hà Nội |
 
-Kết quả nằm trong `data/gold/accidents/vnexpress.parquet`. Các thông tin khác
+Kết quả nằm trong `data/silver/accidents/vnexpress.parquet`. Các thông tin khác
 vẫn có thể thiếu: bài cầu Nhật Tân còn cờ `missing_incident_details`; bổ sung
 tỉnh không có nghĩa tự xác nhận mọi trường đã đầy đủ.
 
@@ -114,12 +115,12 @@ kiểm chứng riêng bằng bước 4.
 ### Quan hệ với phần 3 và dữ liệu đã lưu
 
 Thay đổi này nằm ở cấu hình và code trích xuất **phần 2**, không sửa code trong
-`src/events/`. Gold vẫn có trường `province` như trước để phần 3 đọc.
+`src/events/`. Silver vẫn có trường `province` như trước để phần 3 đọc.
 
 Sau đó phần 3 đã được bổ sung cách xét lại bài chưa có sự kiện. Khi chạy
-`python -m main --step=5`, thông tin mới từ Gold được cập nhật cho những bài
+`python -m main --step=5`, thông tin mới từ Silver được cập nhật cho những bài
 này rồi đem đi tìm/so khớp sự kiện. Bài đã được gán sự kiện vẫn giữ
-liên kết với cùng vụ; nếu Gold thay đổi, nội dung bài và thông tin vụ được cập
+liên kết với cùng vụ; nếu Silver thay đổi, nội dung bài và thông tin vụ được cập
 nhật tự động, có lưu bản cũ để tra lại. Không còn chặn bằng `changed_input`.
 
 Đã chạy lại trên database có sẵn và giữ nguyên hai sự kiện cũ: thêm hai sự kiện

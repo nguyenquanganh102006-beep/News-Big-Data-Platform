@@ -1,4 +1,4 @@
-"""Prepare extracted articles without modifying their Gold files."""
+"""Prepare extracted articles without modifying their Silver files."""
 
 from datetime import datetime
 import hashlib
@@ -7,7 +7,7 @@ import json
 from .retrieval import normalize_province, utc_datetime
 
 
-REQUIRED_GOLD_COLUMNS = {"article_key", "source", "link", "title", "pub_date", "province"}
+REQUIRED_ARTICLE_COLUMNS = {"article_key", "source", "link", "title", "pub_date", "province"}
 
 
 def json_text(value) -> str:

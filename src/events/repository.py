@@ -153,7 +153,7 @@ class EventRepository:
         for field in (*SUMMARY_FIELDS, "published_at", "url", "title", "description"):
             if not article.get(field) and article.get(field) != 0 and not has_field_conflict(article, field):
                 # Missing information is not a correction. Retain the last known
-                # value; the original Gold payload and old version remain auditable.
+                # value; the original Silver payload and old version remain auditable.
                 article[field] = previous.get(field)
             if field in SUMMARY_FIELDS and (article.get(field) != previous.get(field)
                     or has_field_conflict(article, field) != has_field_conflict(previous, field)):

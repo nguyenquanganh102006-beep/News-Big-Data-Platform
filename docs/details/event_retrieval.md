@@ -4,11 +4,11 @@
 
 Đã bổ sung hàm `retrieve_candidates()` chạy trong bộ nhớ: nhận một bài báo và
 bảng sự kiện Polars, trả về các sự kiện cùng tỉnh/thành trong cửa sổ thời gian.
-Không cần crawler, file Gold, DuckDB hoặc phần 3.3 để chạy test.
+Không cần crawler, file Silver, DuckDB hoặc phần 3.3 để chạy test.
 
 Đây là bước tìm ứng viên; việc kết luận cùng vụ và lưu sự kiện thuộc 3.2–3.3.
 Hàm vẫn chạy độc lập với bảng giả trong test, đồng thời đã được dùng trong
-`python -m main --step=5` với bài Gold và sự kiện từ DuckDB. Xem
+`python -m main --step=5` với bài Silver và sự kiện từ DuckDB. Xem
 [hướng dẫn chạy thật](event_database_guide.md).
 
 | File | Vai trò |
@@ -119,7 +119,7 @@ print(result.candidates["event_id"].to_list())     # ['E01']
 phải truy vấn database tối ưu. Test dữ liệu giả xác minh quy tắc, chưa chứng minh
 candidate recall trên bài báo thật hoặc độ đúng của các trường upstream.
 
-Adapter hiện ánh xạ `pub_date` thành `published_at` và kiểm tra dữ liệu Gold.
+Adapter hiện ánh xạ `pub_date` thành `published_at` và kiểm tra dữ liệu Silver.
 Repository 3.3 lọc trước theo tỉnh/thời gian bằng SQL, rồi gọi hàm 3.1 để giữ
 cùng quy tắc. 3.2 nhận danh sách ứng viên để chấm điểm và quyết định gộp;
 hàm 3.1 không tự lưu hay cập nhật sự kiện.

@@ -3,11 +3,11 @@ from dataclasses import dataclass, field
 
 import polars as pl
 
-from .main import DATA_GOLD_DIR
+from .main import DATA_SILVER_DIR
 from .filters import FILTER_SOURCES
 
 EXTRACT_SOURCES = FILTER_SOURCES
-EXTRACT_OUTPUT_DIR = os.path.join(DATA_GOLD_DIR, "accidents")
+EXTRACT_OUTPUT_DIR = os.path.join(DATA_SILVER_DIR, "accidents")
 EXTRACT_VERSION = "rules-v2"
 VNEXPRESS_EXTRACT_VERSION = "rules-v2+vnexpress-dateline-v1"
 VNEXPRESS_LOCATION_SELECTOR = "p.description span.location-stamp"

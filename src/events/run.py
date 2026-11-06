@@ -1,4 +1,4 @@
-"""Read Gold, find/match events, and commit their database together."""
+"""Read Silver articles and write the event database and exports into Gold."""
 
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -8,26 +8,26 @@ from uuid import uuid4
 import polars as pl
 
 from config import (
-    EXTRACT_OUTPUT_DIR, EXTRACT_SOURCES, EVENT_DATABASE_PATH, EVENT_EXPORT_DIR,
+    EVENT_INPUT_DIR, EXTRACT_SOURCES, EVENT_DATABASE_PATH, EVENT_EXPORT_DIR,
     MATCH_WEIGHTS, MATCH_VERSION, AGGREGATION_VERSION, MatchConfig,
 )
-from .adapter import REQUIRED_GOLD_COLUMNS, fingerprint, json_text, prepare_article
+from .adapter import REQUIRED_ARTICLE_COLUMNS, fingerprint, json_text, prepare_article
 from .matching import decide_match
 from .repository import EventRepository
 from .similarity import TextModel
 
 
-def load_gold(input_paths):
+def load_silver_articles(input_paths):
     # Validate all files/schema/rows before opening a database for writes.
     for path in input_paths.values():
         if not Path(path).is_file():
-            raise FileNotFoundError(f"Missing Gold: {path}. Run extraction first (--step=4).")
+            raise FileNotFoundError(f"Missing extracted Silver articles: {path}. Run extraction first (--step=4).")
     articles, seen = [], {}
     for source, path in sorted(input_paths.items()):
         frame = pl.read_parquet(path)
-        missing = REQUIRED_GOLD_COLUMNS - set(frame.columns)
+        missing = REQUIRED_ARTICLE_COLUMNS - set(frame.columns)
         if missing:
-            raise ValueError(f"{path}: missing Gold columns: {', '.join(sorted(missing))}")
+            raise ValueError(f"{path}: missing Silver article columns: {', '.join(sorted(missing))}")
         for index, row in enumerate(frame.iter_rows(named=True)):
             if row["source"] != source:
                 raise ValueError(f"{path}: unexpected source in row {index}")
@@ -35,7 +35,7 @@ def load_gold(input_paths):
             key = article["article_key"]
             if key is not None and key in seen:
                 if seen[key] != article["input_fingerprint"]:
-                    raise ValueError(f"Conflicting Gold rows for article_key {key}")
+                    raise ValueError(f"Conflicting Silver rows for article_key {key}")
                 continue
             if key is not None:
                 seen[key] = article["input_fingerprint"]
@@ -47,9 +47,9 @@ def load_gold(input_paths):
 
 def run_events(input_paths=None, database_path=None, export_dir=None, config=None):
     paths = input_paths if input_paths is not None else {
-        source: Path(EXTRACT_OUTPUT_DIR, f"{source}.parquet") for source in EXTRACT_SOURCES
+        source: EVENT_INPUT_DIR / f"{source}.parquet" for source in EXTRACT_SOURCES
     }
-    incoming = load_gold(paths)
+    incoming = load_silver_articles(paths)
     config = config or MatchConfig()
     config_values = {**asdict(config), "weights": MATCH_WEIGHTS, "match_version": MATCH_VERSION}
     config_id = fingerprint(config_values)
@@ -96,7 +96,7 @@ def run_events(input_paths=None, database_path=None, export_dir=None, config=Non
                         stats["updated_unassigned"] += 1
                     if key in linked:
                         # Any legacy changed_input review is obsolete once the
-                        # current Gold version is already applied to this link.
+                        # current Silver version is already applied to this link.
                         repo.resolve_reviews(key)
                         stats["already_processed"] += 1
                         continue

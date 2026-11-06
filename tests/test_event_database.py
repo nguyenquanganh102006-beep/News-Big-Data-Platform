@@ -231,7 +231,7 @@ class EventDatabaseTests(unittest.TestCase):
         self.assertEqual(stats["database"]["pending_reviews"],0)
         self.assertEqual(self.query("SELECT status FROM match_reviews"), [("resolved",)])
 
-    def test_legacy_review_is_closed_if_current_gold_is_already_applied(self):
+    def test_legacy_review_is_closed_if_current_silver_is_already_applied(self):
         paths = self.inputs({"test": [row("a")]})
         self.run_import(paths)
         repository = EventRepository(self.db)
@@ -315,7 +315,7 @@ class EventDatabaseTests(unittest.TestCase):
             repository.close()
         self.assertEqual(self.query("SELECT fatalities FROM articles"), [(2,)])
 
-    def test_empty_gold_creates_queryable_empty_database_and_exports(self):
+    def test_empty_silver_creates_queryable_empty_database_and_exports(self):
         stats = self.run_import(self.inputs({"test": []}))
         self.assertEqual(stats["input"], 0)
         self.assertEqual(stats["database"]["accident_events"], 0)
@@ -335,7 +335,7 @@ class EventDatabaseTests(unittest.TestCase):
 
     def test_conflicting_input_keys_are_not_silently_deduplicated(self):
         paths = self.inputs({"test": [row("a"), row("a", fatalities=9)]})
-        with self.assertRaisesRegex(ValueError, "Conflicting Gold"):
+        with self.assertRaisesRegex(ValueError, "Conflicting Silver"):
             self.run_import(paths)
         self.assertFalse(self.db.exists())
 

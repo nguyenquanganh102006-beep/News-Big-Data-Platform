@@ -27,7 +27,7 @@ def run_pipeline(step: int = 0) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="RSS -> Bronze -> Silver -> filter -> Gold -> event database")
+    parser = argparse.ArgumentParser(description="RSS -> Bronze -> Silver articles -> Gold event database")
     parser.add_argument("--step", type=int, choices=(0, 1, 2, 3, 4, 5), default=0,
-                        help="0: full pipeline, 1: crawlers, 2: preprocessors, 3: filters, 4: extractors, 5: events")
+                        help="0: full pipeline, 1: crawlers, 2: preprocessors, 3: filters, 4: extract to Silver, 5: Silver to Gold events")
     run_pipeline(step=parser.parse_args().step)

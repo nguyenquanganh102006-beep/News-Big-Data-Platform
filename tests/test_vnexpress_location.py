@@ -141,14 +141,14 @@ class VnexpressLocationTests(unittest.TestCase):
             input_path = root / "filtered/vnexpress/accident.parquet"
             before = input_path.read_bytes()
             with patch("extractors.accident.FILTERED_DATA_DIR", str(root / "filtered")), \
-                 patch("extractors.accident.EXTRACT_OUTPUT_DIR", str(root / "gold")), \
+                 patch("extractors.accident.EXTRACT_OUTPUT_DIR", str(root / "silver/accidents")), \
                  patch("extractors.accident.EXTRACT_SOURCES", ("vnexpress", "other")), \
                  patch("extractors.accident.fetch_vnexpress_locations", return_value=[ArticleLocation("ok", "Hà Nội", "Hà Nội", URL)]) as fetch:
                 extract_filtered_files()
                 extract_filtered_files()
             self.assertEqual(fetch.call_count, 2)
-            enriched = pl.read_parquet(root / "gold/vnexpress.parquet")
+            enriched = pl.read_parquet(root / "silver/accidents/vnexpress.parquet")
             self.assertEqual(enriched["province"].to_list(), ["Hà Nội"])
             self.assertEqual(enriched.height, 1)
-            self.assertNotIn("article_location_status", pl.read_parquet(root / "gold/other.parquet").columns)
+            self.assertNotIn("article_location_status", pl.read_parquet(root / "silver/accidents/other.parquet").columns)
             self.assertEqual(input_path.read_bytes(), before)
