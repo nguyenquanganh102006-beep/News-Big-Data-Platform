@@ -139,8 +139,8 @@ data/
 ├── bronze/<nguồn>/<thời điểm>.parquet       # Tin RSS vừa lấy
 ├── silver/
 │   ├── <nguồn>.parquet                    # Lịch sử bài đã làm sạch
+│   ├── filtered/<nguồn>/                   # Kết quả lọc tai nạn
 │   └── accidents/<nguồn>.parquet          # Phần 2: bài đã trích xuất, đầu vào phần 3
-├── filtered/<nguồn>/                       # Kết quả lọc tai nạn
 └── gold/
     └── events/
         ├── accident_events.duckdb          # Database chính

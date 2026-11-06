@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 import os
 
-from .main import DATA_DIR
+from .main import DATA_SILVER_DIR
 
-FILTERED_DATA_DIR = os.path.join(DATA_DIR, "filtered")
+FILTERED_DATA_DIR = os.path.join(DATA_SILVER_DIR, "filtered")
 FILTER_SOURCES = ("vnexpress", "vietnamplus", "tuoitre")
 
 

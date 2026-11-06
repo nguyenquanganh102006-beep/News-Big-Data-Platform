@@ -1,7 +1,7 @@
 import argparse
 import os
 
-from config import DATA_BRONZE_DIR, DATA_SILVER_DIR, DATA_GOLD_DIR, FILTERED_DATA_DIR
+from config import DATA_BRONZE_DIR, DATA_SILVER_DIR, FILTERED_DATA_DIR, EXTRACT_OUTPUT_DIR
 from crawlers import run_crawlers
 from preprocessors.run import run_preprocessors
 from filters import run_filters
@@ -12,7 +12,7 @@ from events import run_events
 def run_pipeline(step: int = 0) -> None:
     if step not in (0, 1, 2, 3, 4, 5):
         raise ValueError("step must be 0, 1, 2, 3, 4 or 5")
-    for directory in (DATA_BRONZE_DIR, DATA_SILVER_DIR, DATA_GOLD_DIR, FILTERED_DATA_DIR):
+    for directory in (DATA_BRONZE_DIR, DATA_SILVER_DIR, FILTERED_DATA_DIR, EXTRACT_OUTPUT_DIR):
         os.makedirs(directory, exist_ok=True)
     if step in (0, 1):
         run_crawlers()

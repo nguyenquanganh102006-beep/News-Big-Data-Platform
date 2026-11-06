@@ -23,7 +23,9 @@ News-Big-Data-Platform/
 |-- docs/               # Documentations 
 |-- data/               # Contains output data of the program
     |-- bronze/             # Raw data crawled from sources 
-    |-- silver/             # Bài đã làm sạch và accidents/ chứa bài đã trích xuất
+    |-- silver/             # Bài đã làm sạch
+        |-- filtered/       # Kết quả lọc theo nguồn
+        |-- accidents/      # Bài đã trích xuất, đầu vào phần 3
     |-- gold/               # Database sự kiện và bản xuất từ database
 |-- src/                # Source code of the program
     |-- config/             # Contains all the configs, schemas, global constants, ... of the program
@@ -116,11 +118,11 @@ Chi tiết làm sạch: [EDA preprocessors](details/preprocessor_eda.md). Cơ ch
 
 + Input: Silver tích lũy của VnExpress, VietnamPlus, Tuổi Trẻ.
 + Hàm: `run_filters()` phân loại bằng `classify_accident()`.
-+ Output: `classified.parquet`, `accident.parquet`, `not_accident.parquet`, `uncertain.parquet` trong `data/filtered/<source>/`.
++ Output: `classified.parquet`, `accident.parquet`, `not_accident.parquet`, `uncertain.parquet` trong `data/silver/filtered/<source>/`.
 
 ### 5. Extractors
 
-+ Input: `data/filtered/<source>/accident.parquet`, dùng toàn bộ `title` và `description`.
++ Input: `data/silver/filtered/<source>/accident.parquet`, dùng toàn bộ `title` và `description`.
 + Hàm: `run_extractors()` gọi các bước trích xuất bằng luật, regex và từ điển.
   Riêng VnExpress, mở bài đã được filter chọn để đọc nhãn tỉnh/thành ở đầu bài.
 + Output: `data/silver/accidents/<source>.parquet`, thêm địa điểm, phương tiện, thương vong, loại sự cố và bằng chứng.

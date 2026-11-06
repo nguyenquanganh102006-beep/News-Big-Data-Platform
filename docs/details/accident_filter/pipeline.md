@@ -45,7 +45,7 @@ Các lệnh cũ `python -m crawlers.run` và `python -m preprocessors.run` vẫn
 Input `data/silver/<source>.parquet` được đọc toàn bộ. Không lấy riêng DataFrame bài mới do preprocessor trả về: nếu batch không có bài mới vẫn phải giữ các bài đã chọn trước đó.
 
 ```text
-data/filtered/
+data/silver/filtered/
   vnexpress/
     classified.parquet
     accident.parquet
