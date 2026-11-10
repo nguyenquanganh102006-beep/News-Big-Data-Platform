@@ -112,3 +112,19 @@ docker compose exec -T redis redis-cli ping
 được mô tả trong `.env.example`, đọc bởi `src/config/streaming.py`.
 Xem [luồng tổng thể](flow.md) và [hướng dẫn streaming](details/streaming.md)
 để gửi bài bằng Producer, kiểm tra dữ liệu và chạy test.
+
+
+## Batch 4.3 và matching 4.4
+
+Sau khi đã có Silver accidents của cả 7 nguồn RSS:
+
+Preprocessor đọc toàn bộ snapshot Bronze duy nhất trong `data/bronze/` và các
+snapshot crawl đã lưu ở `data_artifacts/diagnostics/`; bản sao cùng nguồn và tên
+snapshot chỉ được xử lý một lần.
+
+```powershell
+.venv/Scripts/python.exe -m batch.run
+```
+
+Batch không cần Redis; database mặc định là `data/gold/batch/canonical.duckdb`.
+Xem [hướng dẫn batch](details/batch_matching.md) để chọn nguồn, đường dẫn và kiểm thử.

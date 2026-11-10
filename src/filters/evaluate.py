@@ -11,7 +11,7 @@ from config import DEBUG, VERSION, FILTER_LABELS
 def evaluate(samples):
     predictions = []
     for row in samples:
-        decision = classify_accident(row["title"], row.get("description_text"))
+        decision = classify_accident(row["title"], row.get("description_text", row.get("description")))
         predictions.append({**row, "prediction": asdict(decision)})
     known = [r for r in predictions if r["label"] != "uncertain"]
     tp = sum(r["label"] == "accident" and r["prediction"]["label"] == "accident" for r in known)
@@ -22,8 +22,8 @@ def evaluate(samples):
     metrics = {
         "version": VERSION, "evaluation_kind": "development_resubstitution_not_independent_test",
         "samples": len(predictions), "known_label_samples": len(known),
-        "known_label_exact_accuracy": sum(r["label"] == r["prediction"]["label"] for r in known) / len(known),
-        "three_label_accuracy": sum(r["label"] == r["prediction"]["label"] for r in predictions) / len(predictions),
+        "known_label_exact_accuracy": sum(r["label"] == r["prediction"]["label"] for r in known) / len(known) if known else None,
+        "three_label_accuracy": sum(r["label"] == r["prediction"]["label"] for r in predictions) / len(predictions) if predictions else None,
         "precision_accident": precision, "recall_accident": recall,
         "f1_accident": 2 * precision * recall / (precision + recall) if precision + recall else 0,
         "true_positive": tp, "false_positive": fp, "false_negative_including_abstentions": fn,

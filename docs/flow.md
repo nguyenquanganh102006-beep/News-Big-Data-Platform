@@ -18,6 +18,10 @@ Xem mục 7 bên dưới; `main --step` vẫn dành cho luồng xử lý hiện 
 
 ## Tiêu chí và đánh giá bộ lọc tai nạn
 
+Phiên bản hiện tại: [rules-v3-road](details/accident_filter/rules_v3.md), áp dụng
+phạm vi đường bộ đã chốt; nhận cháy/vật rơi đè xe trên đường và loại bài chỉ cập
+nhật xử lý sau vụ việc. Trường hợp thiếu bằng chứng vẫn giữ ở hàng review.
+
 Xem [tiêu chí](details/accident_filter/criteria.md) và [cách sinh kết quả đánh giá](details/accident_filter/rules_v1.md). Bộ nhãn trợ lý tự gán và báo cáo điểm số cũ đã được loại bỏ. Đánh giá cần dữ liệu tham chiếu được kiểm duyệt, truyền qua `--samples`; kết quả sinh ra nằm trong `data/evaluation/accident_filter/` và không commit vào Git.
 
 ## Folder architecture
@@ -25,10 +29,12 @@ Xem [tiêu chí](details/accident_filter/criteria.md) và [cách sinh kết qu�
 ```text
 News-Big-Data-Platform/
 |-- docs/               # Documentations 
-|-- data/               # Contains output data of the program
+|-- data/               # Bronze, Silver và Gold
+|-- data_artifacts/     # Dashboard snapshots và diagnostics
     |-- bronze/             # Raw data crawled from sources 
     |-- silver/             # Bài đã làm sạch
-        |-- filtered/       # Kết quả lọc theo nguồn
+        |-- deduplicated/  # Task 2.2: cờ bài trùng và manifest
+        |-- filtered/       # Kết quả lọc, chỉ gồm bài gốc
         |-- accidents/      # Bài đã trích xuất, đầu vào phần 3
     |-- gold/               # Database sự kiện và bản xuất từ database
 |-- src/                # Source code of the program
@@ -107,7 +113,7 @@ News-Big-Data-Platform/
         |-- run.py                  # Main file to run all the preprocessors
 ```
 
-+ Input: file `.parquet` mới nhất theo tên timestamp trong `data/bronze/<source>/` (output của `crawlers`). Chạy crawler trước nếu chưa có file. Silver được tích lũy sau khi loại trùng trong batch và so với lịch sử.
++ Input: các snapshot `.parquet` trong `data/bronze/<source>/` và snapshot lịch sử trong `data_artifacts/diagnostics/`. Silver được tích lũy sau khi loại trùng trong batch và so với lịch sử.
 
 + Run pipeline
 ```bash
@@ -119,11 +125,15 @@ python -m preprocessors.run
 
 Chi tiết làm sạch: [EDA preprocessors](details/preprocessor_eda.md). Cơ chế chọn file, chuẩn hóa URL và lưu lịch sử: [dedup preprocessors](details/preprocessor_dedup.md).
 
-### 4. Filters
+### 4. Filters và phát hiện bài trùng 2.2
 
-+ Input: Silver tích lũy của VnExpress, VietnamPlus, Tuổi Trẻ.
-+ Hàm: `run_filters()` phân loại bằng `classify_accident()`.
++ Input: Silver tích lũy của cả 7 nguồn RSS.
++ Trước khi phân loại, `run_filters()` gọi `run_content_dedup()`; TF-IDF + cosine so tiêu đề và mô tả trong cửa sổ 24 giờ, ngưỡng mặc định `>= 0.85`.
++ Bài trùng được giữ trong `data/silver/deduplicated/` với `is_duplicate`, `duplicate_of_article_key` và điểm tương đồng. Chỉ bài gốc đi vào phân loại.
++ Hàm phân loại: `classify_accident()`.
 + Output: `classified.parquet`, `accident.parquet`, `not_accident.parquet`, `uncertain.parquet` trong `data/silver/filtered/<source>/`.
+
+Chi tiết: [Task 2.2 — Duplicate Article Detection](details/content_duplicate_detection.md). Ghi chú EDA HTML VietnamPlus cũ ở [preprocessor_eda.md](details/preprocessor_eda.md) được giữ nguyên.
 
 ### 5. Extractors
 
@@ -138,7 +148,7 @@ Chi tiết: [trích xuất thông tin tai nạn](details/accident_extraction.md)
 
 ### 6. Sự kiện tai nạn (3.1, 3.2, 3.3)
 
-Input: `data/silver/accidents/<source>.parquet` của ba nguồn hiện có. Đọc chung
+Input: `data/silver/accidents/<source>.parquet` của cả 7 nguồn RSS. Đọc chung
 các nguồn, sắp bài theo ngày đăng rồi khóa bài. Kho sự kiện được đọc từ DuckDB;
 sự kiện vừa tạo được dùng ngay để so sánh bài tiếp theo.
 
@@ -190,8 +200,8 @@ News-Big-Data-Platform/
 |-- docs/details/streaming.md
 ```
 
-+ Input: một bài theo schema RSS Bronze, kèm `source` thuộc `vnexpress`,
-  `vietnamplus` hoặc `tuoitre`. Crawler gọi `enqueue_article()` sau khi lưu
++ Input: một bài theo schema RSS Bronze, kèm `source` thuộc một trong 7 RSS source.
+  Producer gọi `enqueue_article()` sau khi lưu
   Bronze; hiện chưa tự động thay luồng crawler cũ.
 + Config: `src/config/streaming.py`, biến môi trường trong `.env.example`:
   `REDIS_URL`, `REDIS_ARTICLE_QUEUE`, `STREAM_DATABASE_PATH`.
@@ -215,7 +225,33 @@ Terminal khác gửi một file JSON Bronze:
 + Chỉ chạy một Consumer cho mỗi cặp queue/database. Ctrl+C dừng an toàn sau
   bài hiện tại. Message lỗi được retry hoặc giữ trong `<queue>:dead`.
 + `python -m streaming.consumer` vẫn chạy được như lệnh trực tiếp tương đương.
-  Chưa triển khai Batch 4.3 hoặc chuẩn hóa matching 4.4.
+  Matching dùng chung với batch qua `events.service.MatchingService`; mặc định
+  streaming xét 24 giờ trước timestamp bài, gồm hai biên, loại sự kiện tương lai.
 
 Contract JSON, truy vấn DB, kiểm thử và giới hạn:
 [hướng dẫn streaming](details/streaming.md).
+
+
+### 8. Batch 4.3 và matching dùng chung 4.4
+
+Silver đã trích xuất (`data/silver/accidents/*.parquet`) → dedup → matching giai đoạn 3
+→ dựng lại canonical trong staging → kiểm tra → thay database chính thức.
+
+```powershell
+.venv/Scripts/python.exe -m batch.run
+```
+
+Đầu ra: `data/gold/batch/canonical.duckdb`, gồm `canonical_events`, liên kết bài–vụ,
+review và manifest lần chạy. Không sửa database provisional hoặc dữ liệu Silver.
+Batch đọc toàn bộ lịch sử nhưng giữ retrieval ±48 giờ của giai đoạn 3.
+Hướng dẫn interface, chạy lại và giới hạn: [Batch và matching](details/batch_matching.md).
+
+### 9. Dashboard local
+
+```powershell
+.venv/Scripts/python.exe -m streamlit run src/dashboard/app.py
+```
+
+Mở `http://127.0.0.1:8501` để xem bộ dữ liệu hiện hành, bài báo, sự kiện canonical/
+provisional và các bài chờ review. Dashboard chỉ đọc; xem
+[hướng dẫn dashboard](details/dashboard.md).

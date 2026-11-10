@@ -13,7 +13,7 @@ Không cần API key hoặc dịch vụ LLM.
 
 ## Input và output
 
-Input: `data/silver/filtered/<source>/accident.parquet`, ba nguồn theo `EXTRACT_SOURCES`.
+Input: `data/silver/filtered/<source>/accident.parquet`, cả 7 RSS source trong `EXTRACT_SOURCES`.
 Đọc toàn bộ `title` và `description`, giải mã HTML entity và chuẩn hóa Unicode NFC.
 Riêng VnExpress, bước này mở URL của bài đã được filter chọn và đọc nhãn
 tỉnh/thành nằm đầu bài (`p.description span.location-stamp`). Ví dụ nhãn

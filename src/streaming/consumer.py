@@ -1,13 +1,12 @@
 import argparse
-from contextlib import contextmanager
 import logging
-import os
 from pathlib import Path
 import signal
 import threading
 
 from redis.exceptions import RedisError
 
+from events.locking import writer_lock
 from .message import parse_message
 from .pipeline import ArticleProcessor
 from .queue import ArticleQueue
@@ -17,31 +16,6 @@ from config.streaming import database_path, queue_name, redis_client
 LOG = logging.getLogger(__name__)
 
 
-@contextmanager
-def writer_lock(database):
-    """OS releases the lock after crashes; also guards same-host recovery."""
-    path = Path(str(database) + ".writer.lock")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a+b") as handle:
-        handle.seek(0, 2)
-        if handle.tell() == 0:
-            handle.write(b"0")
-            handle.flush()
-        handle.seek(0)
-        if os.name == "nt":
-            import msvcrt
-            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
-        else:
-            import fcntl
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        try:
-            yield
-        finally:
-            handle.seek(0)
-            if os.name == "nt":
-                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
-            else:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 class Consumer:

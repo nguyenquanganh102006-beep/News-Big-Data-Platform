@@ -1,18 +1,16 @@
-from dataclasses import asdict
-from datetime import datetime
 import json
 
 from bs4 import BeautifulSoup
 import polars as pl
 
-from config import MatchConfig, MATCH_WEIGHTS, MATCH_VERSION
-from events.adapter import prepare_article, fingerprint, json_text
-from events.matching import decide_match
+from config import MatchConfig
+from events.adapter import prepare_article, json_text
+from events.service import MatchingService
 from events.similarity import TextModel
 from extractors.accident import extract_frame
 from extractors.vnexpress import fetch_vnexpress_locations
 from filters.accident import classify_accident
-from preprocessors.utils import convert_string_to_datetime_utc
+from preprocessors.rss_generic import parse_rss_date
 
 
 def clean_text(text):
@@ -26,19 +24,19 @@ def clean_text(text):
 def clean_article(row):
     row = dict(row)
     row["title"] = clean_text(row["title"])
-    row["description"] = clean_text(row["description"])
+    description = row["description"]
+    if row["source"] == "vietnamplus":
+        # Match Silver preprocessing: the paragraph is the lead; surrounding
+        # anchors are image/related stories and can introduce unrelated places.
+        paragraph = BeautifulSoup(description, "html.parser").find("p")
+        if paragraph is not None:
+            description = str(paragraph)
+    row["description"] = clean_text(description)
     if not row["title"]:
         raise ValueError("empty title after cleaning")
-    value = row["pub_date"]
-    try:
-        date = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        if date.tzinfo is None:
-            raise ValueError("ISO timestamps must include timezone")
-    except ValueError:
-        if row["source"] == "tuoitre":
-            date = convert_string_to_datetime_utc(value, "%m/%d/%Y %I:%M:%S %p", 7)
-        else:
-            date = convert_string_to_datetime_utc(value)
+    date = parse_rss_date(row["pub_date"])
+    if date is None:
+        raise ValueError("invalid RSS publication date")
     row["pub_date"] = date
     return row
 
@@ -46,9 +44,9 @@ def clean_article(row):
 class ArticleProcessor:
     def __init__(self, repo, config=None):
         self.repo = repo
-        self.config = config or MatchConfig()
-        self.config_id = fingerprint({**asdict(self.config), "weights": MATCH_WEIGHTS,
-                                      "match_version": MATCH_VERSION})
+        self.config = config or MatchConfig(radius_hours=24)
+        self.matching = MatchingService(self.config, past_only=True)
+        self.config_id = self.matching.config_id
 
     def process(self, row):
         repo, key = self.repo, row["article_key"]
@@ -74,9 +72,8 @@ class ArticleProcessor:
                 stored = repo.read_articles()
                 repo.insert_article(article)
                 stored[key] = article
-                candidates = [] if article["reasons"] else repo.find_candidates(article, self.config, stored)
                 model = TextModel([a["text"] for a in stored.values()])
-                decision = decide_match(article, candidates, model, self.config)
+                decision = self.matching.decide(article, repo, stored, model)
                 status = decision["decision"]
                 if status == "needs_review":
                     repo.save_review(article, decision)

@@ -124,6 +124,8 @@ Vấn đề: Tất cả các description đều có tag link `<a>` bọc ngoài 
 
 **Attempt 2**: Check range $[56, 81]$
 
+> Ghi chú: Phần EDA HTML VietnamPlus bên dưới được giữ nguyên như tài liệu lịch sử. Yêu cầu phát hiện bài báo trùng nội dung hiện hành nằm tại [Task 2.2 — Duplicate Article Detection](content_duplicate_detection.md).
+
 #### 2.2. description
 
 **Attempt 1**: Description cái này hơi bựa, nó gồm 1 ảnh bọc trong 1 link, 1 đoạn text, và 3 cái link (chưa rõ link gì, nhưng có vẻ là link liên quan đến bài báo thôi). Tổng cộng 4 link, trong đó link bọc ngoài ảnh giống cột `link` -> Chỉ cần lấy 3 link còn lại là được. 

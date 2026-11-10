@@ -1,6 +1,5 @@
 """Read Silver articles and write the event database and exports into Gold."""
 
-from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -9,10 +8,10 @@ import polars as pl
 
 from config import (
     EVENT_INPUT_DIR, EXTRACT_SOURCES, EVENT_DATABASE_PATH, EVENT_EXPORT_DIR,
-    MATCH_WEIGHTS, MATCH_VERSION, AGGREGATION_VERSION, MatchConfig,
+    AGGREGATION_VERSION, MatchConfig,
 )
-from .adapter import REQUIRED_ARTICLE_COLUMNS, fingerprint, json_text, prepare_article
-from .matching import decide_match
+from .adapter import REQUIRED_ARTICLE_COLUMNS, json_text, prepare_article
+from .service import MatchingService
 from .repository import EventRepository
 from .similarity import TextModel
 
@@ -51,8 +50,9 @@ def run_events(input_paths=None, database_path=None, export_dir=None, config=Non
     }
     incoming = load_silver_articles(paths)
     config = config or MatchConfig()
-    config_values = {**asdict(config), "weights": MATCH_WEIGHTS, "match_version": MATCH_VERSION}
-    config_id = fingerprint(config_values)
+    service = MatchingService(config)
+    config_values = service.config_values
+    config_id = service.config_id
     repo = EventRepository(database_path if database_path is not None else EVENT_DATABASE_PATH)
     stats = {"input": len(incoming), "new_event": 0, "matched": 0, "needs_review": 0,
              "already_processed": 0, "changed_input": 0, "updated_unassigned": 0,
@@ -105,9 +105,7 @@ def run_events(input_paths=None, database_path=None, export_dir=None, config=Non
                     stored[key] = article
                 if key is not None:
                     repo.resolve_reviews(key)
-                candidates = [] if article["reasons"] else repo.find_candidates(article, config, stored)
-                decision = decide_match(article, candidates, model, config)
-                decision.update(config_fingerprint=config_id, model_fingerprint=model.fingerprint)
+                decision = service.decide(article, repo, stored, model)
                 kind = decision["decision"]
                 stats[kind] += 1
                 if kind == "needs_review":

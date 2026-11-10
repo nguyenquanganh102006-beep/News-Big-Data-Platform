@@ -17,7 +17,8 @@ còn **Consumer lấy bài ra, xử lý và lưu kết quả**.
 
 Sự kiện tạm (`Provisional Event`) là vụ tai nạn được hệ thống nhận diện ban đầu.
 Kết quả có thể còn thiếu hoặc gom chưa đúng; bước Batch sau này sẽ xem lại để
-tạo dữ liệu chính thức. Lần này chưa làm Batch 4.3 hoặc công việc 4.4.
+tạo dữ liệu chính thức. Batch 4.3 và interface dùng chung 4.4 được mô tả trong
+[hướng dẫn batch và matching](batch_matching.md).
 
 Mã nguồn nằm trên nhánh `task/41-42`. Cách đánh số theo bảng phân công cuối của
 IT4931: **4.1 là Redis Queue, 4.2 là Streaming Consumer**.
@@ -44,7 +45,7 @@ Lần chạy thật này chỉ có một bài nên chứng minh được luồng
 DuckDB. Trường hợp nhiều bài cùng vụ được kiểm tra bằng dữ liệu mẫu có kết quả
 biết trước; chưa dùng lần chạy một bài để kết luận độ chính xác của việc gom.
 
-Bằng chứng nằm trong `data/diagnostics/streaming_conventions_20261110_124637/`:
+Bằng chứng nằm trong `data_artifacts/diagnostics/streaming_conventions_20261110_124637/`:
 
 | File | Dùng để xem gì? |
 |---|---|
@@ -61,8 +62,9 @@ Producer nhận một bài theo cấu trúc RSS Bronze, kiểm tra các trườn
 chuyển thành JSON rồi gửi vào hàng đợi `article_queue`. Producer chưa lọc tai
 nạn hoặc tạo sự kiện. Nếu Redis không kết nối được thì báo lỗi cho bên gửi.
 
-Ba nguồn đang hỗ trợ là **VnExpress, VietnamPlus và Tuổi Trẻ**. Đầu vào cần có
-nguồn, tiêu đề, URL, thời gian đăng và mô tả; mô tả có thể rỗng. Consumer sẽ
+Bảy nguồn RSS đang được validator hỗ trợ là **VnExpress, VietnamPlus, Tuổi Trẻ,
+Dân Trí, Thanh Niên, Báo Xây Dựng và Tiền Phong**. Đầu vào cần có nguồn, tiêu đề,
+URL, thời gian đăng và mô tả; mô tả có thể rỗng. Consumer sẽ
 kiểm tra định dạng thời gian khi xử lý.
 
 Đã cung cấp hàm để crawler gọi sau khi lưu Bronze:
@@ -87,8 +89,9 @@ Consumer chạy liên tục, chờ đến khi Redis có bài mới. Mỗi bài �
    được đưa sang bước tạo sự kiện.
 4. Trích xuất địa điểm, phương tiện và thương vong bằng code phần 2.
    VnExpress có thêm bước đọc nhãn tỉnh/thành ở đầu trang bài.
-5. Dùng code phần 3 tìm vụ cùng tỉnh trong khoảng **48 giờ trước đến 48 giờ
-   sau mốc đăng bài**, rồi so nội dung, địa điểm, phương tiện và thời gian.
+5. Gọi interface matching dùng chung của phần 3, tìm vụ cùng tỉnh trong khoảng
+   **24 giờ trước đến đúng mốc đăng bài** (gồm hai biên, loại candidate tương lai),
+   rồi so nội dung, địa điểm, phương tiện và thời gian.
 6. Lưu bài và kết quả vào DuckDB.
 
 Ví dụ một bài nói về xe tải va chạm xe máy tại Hà Nội:

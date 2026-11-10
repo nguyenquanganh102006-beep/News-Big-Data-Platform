@@ -10,6 +10,7 @@ DEBUG = (os.getenv("DEBUG", "false").lower() == "true")
 # Folder structure
 PWD = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # ../../../News-Big-Data-Platform
 DATA_DIR = os.path.join(PWD, "data")
+DATA_ARTIFACTS_DIR = os.path.join(PWD, "data_artifacts")
 DATA_BRONZE_DIR = os.path.join(DATA_DIR, "bronze")
 DATA_SILVER_DIR = os.path.join(DATA_DIR, "silver")
 DATA_GOLD_DIR = os.path.join(DATA_DIR, "gold")

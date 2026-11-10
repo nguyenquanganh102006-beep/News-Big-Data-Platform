@@ -3,8 +3,12 @@ from tempfile import NamedTemporaryFile
 
 import polars as pl
 
-from config import DEBUG, RSS_SOURCES, FILTERED_DATA_DIR, FILTER_SOURCES, FILTER_LABELS
+from config import (
+    DEBUG, RSS_SOURCES, FILTERED_DATA_DIR, DEDUPLICATED_DATA_DIR,
+    FILTER_SOURCES, FILTER_LABELS,
+)
 from .accident import classify_accident
+from preprocessors.content_dedup import run_content_dedup
 
 
 def filter_frame(df: pl.DataFrame) -> pl.DataFrame:
@@ -32,7 +36,10 @@ def write_parquet_atomic(df: pl.DataFrame, path: Path) -> None:
 
 
 def filter_silver_file(input_path: Path, output_dir: Path) -> dict[str, int]:
-    classified = filter_frame(pl.read_parquet(input_path))
+    frame = pl.read_parquet(input_path)
+    if "is_duplicate" in frame.columns:
+        frame = frame.filter(~pl.col("is_duplicate").fill_null(False))
+    classified = filter_frame(frame)
     partitions = {label: classified.filter(pl.col("accident_label") == label)
                   for label in FILTER_LABELS}
     write_parquet_atomic(classified, output_dir / "classified.parquet")
@@ -42,13 +49,18 @@ def filter_silver_file(input_path: Path, output_dir: Path) -> dict[str, int]:
 
 
 def run_filters() -> None:
-    # Validate all required inputs before replacing any output.
+    # Validate all required inputs before producing deduplicated/filter outputs.
     for source in FILTER_SOURCES:
         path = Path(RSS_SOURCES[source]["silver_save_path"])
         if not path.is_file():
             raise FileNotFoundError(f"Missing Silver: {path}. Run preprocessors first.")
+    dedup_stats = run_content_dedup()
+    if DEBUG:
+        print("[Content dedup] " + ", ".join(
+            f"{key}={dedup_stats[key]}" for key in ("input", "duplicates", "retained")
+        ))
     for source in FILTER_SOURCES:
-        counts = filter_silver_file(Path(RSS_SOURCES[source]["silver_save_path"]),
+        counts = filter_silver_file(Path(DEDUPLICATED_DATA_DIR) / f"{source}.parquet",
                                     Path(FILTERED_DATA_DIR) / source)
         if DEBUG:
             print(f"[Filter] source={source}, " + ", ".join(f"{key}={value}" for key, value in counts.items()))

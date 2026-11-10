@@ -31,6 +31,20 @@ def article(link="https://www.vietnamplus.vn/test-1.html", **changes):
 
 
 class StreamingTests(unittest.TestCase):
+    def test_vietnamplus_related_articles_do_not_pollute_location(self):
+        payload = article(
+            title="Thành phố Hồ Chí Minh: Xe ben va chạm xe máy, hai người tử vong",
+            description='<a href="image"><img src="image.jpg"></a>'
+                        '<p>Xe ben va chạm xe máy khiến hai người tử vong.</p>'
+                        '<a href="other">Xe tải gây tai nạn tại Hà Nội</a>')
+        cleaned = clean_article(normalize_article(payload))
+        self.assertNotIn("Hà Nội", cleaned["description"])
+        self.assertEqual(cleaned["description"], "Xe ben va chạm xe máy khiến hai người tử vong.")
+        result = self.processor.process(normalize_article(payload))
+        self.assertEqual(result["status"], "new_event")
+        self.assertEqual(self.repo.connection.execute(
+            "SELECT province FROM provisional_events").fetchall(), [("TP Hồ Chí Minh",)])
+
     def setUp(self):
         self.tmp = TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)

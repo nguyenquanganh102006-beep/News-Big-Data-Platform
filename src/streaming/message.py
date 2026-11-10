@@ -3,9 +3,10 @@ from datetime import datetime
 import json
 
 from config.schemas import RssBronzeBaseModel
+from config import RSS_SOURCES
 from preprocessors.utils import dedup_make_article_key, dedup_normalize_article_url
 
-SOURCES = {"vnexpress", "vietnamplus", "tuoitre"}
+SOURCES = frozenset(RSS_SOURCES)
 
 
 def normalize_article(value):
@@ -13,7 +14,7 @@ def normalize_article(value):
         raise ValueError("article must be a JSON object")
     source = value.get("source")
     if source not in SOURCES:
-        raise ValueError("source must be vnexpress, vietnamplus or tuoitre")
+        raise ValueError(f"source must be one of: {', '.join(sorted(SOURCES))}")
     row = dict(value)
     for name in ("title", "description", "pub_date", "link"):
         item = row.get(name)

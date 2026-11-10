@@ -8,7 +8,7 @@ from .filters import FILTER_SOURCES
 
 EXTRACT_SOURCES = FILTER_SOURCES
 EXTRACT_OUTPUT_DIR = os.path.join(DATA_SILVER_DIR, "accidents")
-EXTRACT_VERSION = "rules-v2"
+EXTRACT_VERSION = "rules-v2-all-rss-v1"
 VNEXPRESS_EXTRACT_VERSION = "rules-v2+vnexpress-dateline-v1"
 VNEXPRESS_LOCATION_SELECTOR = "p.description span.location-stamp"
 VNEXPRESS_FETCH_TIMEOUT = (5, 20)

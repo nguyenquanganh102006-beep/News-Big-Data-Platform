@@ -1,6 +1,6 @@
 from .main import (
     PRODUCTION_ENV, DEBUG, 
-    PWD, DATA_DIR, DATA_BRONZE_DIR, DATA_SILVER_DIR, DATA_GOLD_DIR,
+    PWD, DATA_DIR, DATA_ARTIFACTS_DIR, DATA_BRONZE_DIR, DATA_SILVER_DIR, DATA_GOLD_DIR,
     DEFAULT_STRING,
 )
 from .schemas import (
@@ -13,17 +13,22 @@ from .crawlers import (
 )
 
 __all__ = [
-    "PRODUCTION_ENV", "DEBUG", "PWD", "DATA_DIR", "DATA_BRONZE_DIR", "DATA_SILVER_DIR", "DATA_GOLD_DIR", "DEFAULT_STRING",
+    "PRODUCTION_ENV", "DEBUG", "PWD", "DATA_DIR", "DATA_ARTIFACTS_DIR", "DATA_BRONZE_DIR", "DATA_SILVER_DIR", "DATA_GOLD_DIR", "DEFAULT_STRING",
     "RssBronzeBaseModel", "RssVnexpressBronzeModel", "RssVietnamplusBronzeModel", "RssTuoitreBronzeModel", "RssDantriBronzeModel", "RssThanhnienBronzeModel", "RssBaoxaydungBronzeModel", "RssTienphongBronzeModel",
     "RSS_SOURCES", "HTML_SOURCES", "FEEDPARSER_MAP_FIELDS", "handleMetadateKey", "handleColonKey", "handleDuplicateKey", "handleConvertCamelToSnake",
 ]
 
 from .preprocessors import TRACKING_QUERY_PARAMS, latest_bronze_path
-from .filters import FILTERED_DATA_DIR, FILTER_SOURCES, FILTER_LABELS, VERSION, Decision
+from .filters import (
+    FILTERED_DATA_DIR, DEDUPLICATED_DATA_DIR, FILTER_SOURCES, FILTER_LABELS,
+    VERSION, Decision, DUPLICATE_SIMILARITY_THRESHOLD, DUPLICATE_WINDOW_HOURS,
+    DUPLICATE_ALGORITHM_VERSION,
+)
 
 __all__ += [
-    "TRACKING_QUERY_PARAMS", "latest_bronze_path", "FILTERED_DATA_DIR",
+    "TRACKING_QUERY_PARAMS", "latest_bronze_path", "FILTERED_DATA_DIR", "DEDUPLICATED_DATA_DIR",
     "FILTER_SOURCES", "FILTER_LABELS", "VERSION", "Decision",
+    "DUPLICATE_SIMILARITY_THRESHOLD", "DUPLICATE_WINDOW_HOURS", "DUPLICATE_ALGORITHM_VERSION",
 ]
 
 from .extractors import (
