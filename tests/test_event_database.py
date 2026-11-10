@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 import duckdb
 import polars as pl
+from config import MatchConfig
 
 from events.run import run_events
 from events.adapter import prepare_article
@@ -51,7 +52,7 @@ class EventDatabaseTests(unittest.TestCase):
 
     def run_import(self, paths):
         with redirect_stdout(StringIO()):
-            return run_events(paths, self.db, self.exports)
+            return run_events(paths, self.db, self.exports, config=MatchConfig(semantic_model=None))
 
     def query(self, sql):
         with duckdb.connect(str(self.db), read_only=True) as connection:

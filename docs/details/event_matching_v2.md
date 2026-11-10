@@ -8,7 +8,7 @@ Bản triển khai: `hybrid-evidence-v2`. Mục tiêu là nhận diện cùng **
 flowchart TD
     A[Silver: tiêu đề, mô tả, thân bài nếu có] --> B[Chuẩn hóa và lập hồ sơ vụ việc]
     B --> C[Tìm ứng viên cùng tỉnh và gần thời gian]
-    C --> D[So từng cặp: TF-IDF, embedding tùy chọn, bằng chứng vụ việc]
+    C --> D[So từng cặp: TF-IDF, embedding mặc định, bằng chứng vụ việc]
     D --> E[Kiểm tra mâu thuẫn với mọi thành viên của cụm]
     E --> F{Đủ bằng chứng và cách biệt ứng viên?}
     F -->|Có| G[Gán event_id hiện có]
@@ -57,8 +57,8 @@ API `retrieve_candidates()` của 3.1 vẫn giữ hợp đồng cửa sổ của
 
 Hai chế độ dùng chung toàn bộ kiểm tra bằng chứng:
 
-- **Mặc định, chạy offline:** character TF-IDF + hồ sơ vụ việc.
-- **Có embedding:** thêm `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` qua FastEmbed/ONNX trên CPU. Không gọi API trả phí hay gửi nội dung bài báo ra ngoài; lần đầu cần tải trọng số mô hình.
+- **Mặc định:** character TF-IDF + hồ sơ vụ việc + embedding `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` qua FastEmbed/ONNX trên CPU. Không gọi API trả phí hay gửi nội dung bài báo ra ngoài; lần đầu cần tải trọng số mô hình, các lần sau dùng cache.
+- **Tắt embedding tường minh:** dùng `--no-embedding` hoặc `MatchConfig(semantic_model=None)` để chỉ dùng TF-IDF + hồ sơ vụ việc. Thiếu thư viện/mô hình sẽ báo lỗi, không tự âm thầm đổi chế độ.
 
 Điểm văn bản khi bật embedding:
 
@@ -94,27 +94,29 @@ Lưu `lexical_score`, `semantic_score`, điểm từng thành phần, chi tiết
 
 ## Chạy trong repo
 
-Chế độ mặc định không cần thêm thư viện:
+FastEmbed nằm trong dependency mặc định. Cài project và chạy bình thường:
 
 ```bash
+.venv/bin/python -m pip install -e .
 PYTHONPATH=src .venv/bin/python -m main --step=5
 ```
 
-Bật embedding:
+Lần đầu tải trọng số; những lần sau dùng cache trong `data/models/fastembed`. Có thể chỉ định vị trí cache bằng `--model-cache`. Chỉ cần `--semantic-model` khi muốn thay model mặc định.
+
+Muốn chủ động tắt embedding:
 
 ```bash
-.venv/bin/python -m pip install -e '.[semantic]'
-PYTHONPATH=src .venv/bin/python -m main --step=5 \
-  --semantic-model sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+PYTHONPATH=src .venv/bin/python -m main --step=5 --no-embedding
 ```
+
+Các CLI `main`, `events.run` và `events.evaluate` dùng chung mặc định và các tùy chọn này.
 
 Liên kết đã lưu trong Gold vẫn được giữ nguyên khi chạy lại. Muốn đánh giá thuật toán mới, dùng database mới thay vì mong nó tự gộp lại các sự kiện cũ:
 
 ```bash
 PYTHONPATH=src .venv/bin/python -m events.evaluate \
   --input-dir data/silver/accidents \
-  --output-dir data/evaluation/events/my_new_run \
-  --semantic-model sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+  --output-dir data/evaluation/events/my_new_run
 ```
 
 `--output-dir` phải chưa tồn tại. CLI đánh giá chạy lại lần hai để kiểm tra tính ổn định và xác nhận SHA-256 đầu vào không đổi. Muốn đánh giá 7 nguồn đã chuẩn bị trong phiên làm việc này, thay input bằng `data/evaluation/event_matching/real_only_rvg3xi_5/articles`.
@@ -147,8 +149,8 @@ Cùng đầu vào 30 bài được bộ lọc chọn từ 410 bài thật ở 7 
 | Cấu hình | Bài được nối vào sự kiện có sẵn | Bài chờ |
 |---|---:|---:|
 | Baseline v1 đã chạy trước thay đổi | 0 | 9 |
-| v2: bằng chứng + TF-IDF | 2 | 7 |
-| v2: bằng chứng + TF-IDF + embedding | 4 | 5 |
+| v2 tắt embedding: bằng chứng + TF-IDF | 2 | 7 |
+| v2 mặc định: bằng chứng + TF-IDF + embedding | 4 | 5 |
 
 Bản có embedding gom được các cặp: hầm Phan Thúc Duyện; tai nạn đường Hồ Chí Minh ở Huế; container tông người đi bộ ở Nghệ An; tin theo dõi ô tô chèn ép thai phụ ở Lào Cai.
 

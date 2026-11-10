@@ -134,11 +134,12 @@ def run_events(input_paths=None, database_path=None, export_dir=None, config=Non
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Match Silver reports using incident evidence and optional embeddings")
-    parser.add_argument("--semantic-model", help="FastEmbed model name; install the semantic extra first")
-    parser.add_argument("--model-cache", help="Directory for downloaded embedding models")
+    from .cli import add_matching_arguments, matching_config
+
+    parser = argparse.ArgumentParser(description="Match Silver reports using incident evidence and embeddings by default")
+    add_matching_arguments(parser)
     parser.add_argument("--database", type=Path, help="Use a fresh path to evaluate a new matcher version")
     parser.add_argument("--export-dir", type=Path)
     args = parser.parse_args()
     run_events(database_path=args.database, export_dir=args.export_dir,
-               config=MatchConfig(semantic_model=args.semantic_model, semantic_cache_dir=args.model_cache))
+               config=matching_config(args))

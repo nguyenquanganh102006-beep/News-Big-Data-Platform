@@ -28,7 +28,7 @@ def report(key, **changes):
 
 def classify(left, right, model_class=TextModel):
     a, b = prepare_article(left), prepare_article(right)
-    model = model_class([a["text"], b["text"]])
+    model = model_class([a["text"], b["text"]], semantic_model=None)
     event = {"event_id": "event", "text": a["text"], "members": [a],
              "vehicles": a["vehicles"], "anchor_published_at": a["published_at"]}
     return decide_match(b, [event], model, MatchConfig())
@@ -89,7 +89,8 @@ class EventEvidenceTests(unittest.TestCase):
             path = root / "test.parquet"
             pl.DataFrame([report("a"), report("b", pub_date="2026-11-01T14:00:00+07:00")]).write_parquet(path)
             with redirect_stdout(StringIO()):
-                result = run_events({"test": path}, root / "events.duckdb", root / "exports")
+                result = run_events({"test": path}, root / "events.duckdb", root / "exports",
+                                    config=MatchConfig(semantic_model=None))
             self.assertEqual((result["new_event"], result["matched"]), (1, 1))
 
     def test_body_is_available_after_database_reload(self):

@@ -162,7 +162,8 @@ python -m events.inspect
   có mâu thuẫn.
 - 3.2 lập hồ sơ vụ việc, so TF-IDF/embedding cùng địa điểm, ngày xảy ra, đối tượng
   và phương tiện; kiểm tra bằng chứng với từng thành viên của cụm. Bài mơ hồ vào
-  review. Chi tiết: [matching v2](details/event_matching_v2.md).
+  review. Embedding chạy mặc định; có thể tắt rõ ràng bằng `--no-embedding`.
+  Chi tiết: [matching v2](details/event_matching_v2.md).
 - 3.3 lưu vào `data/gold/events/accident_events.duckdb`; xuất Parquet trong
   `data/gold/events/exports/`.
 

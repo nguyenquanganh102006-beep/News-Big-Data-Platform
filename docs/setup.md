@@ -52,7 +52,8 @@ Nếu thêm thư viện vào danh sách `dependencies`, chạy lại lệnh cài
 | setuptools | Hỗ trợ cài đặt project |
 | polars | Làm sạch, đọc và ghi dữ liệu |
 | duckdb, pytz | Lưu database và đọc thời gian có múi giờ |
-| scikit-learn | So sánh nội dung các bài báo |
+| scikit-learn | So sánh từ vựng giữa các bài báo |
+| fastembed | Embedding đa ngôn ngữ mặc định cho bước gom sự kiện, chạy trên CPU |
 | ... | ... |
 
 ## 5. Cài đặt dependencies
@@ -93,7 +94,7 @@ python -m events.inspect
 `main` tự tạo thư mục dữ liệu. Lệnh đầu lấy RSS và xử lý đến database; lệnh sau
 hiển thị các sự kiện đã lưu. Nếu đã có bài trích xuất trong
 `data/silver/accidents/` và chỉ muốn chạy phần sự kiện,
-dùng `python -m main --step=5`.
+dùng `python -m main --step=5`. Bước này mặc định dùng embedding; lần đầu tải model, các lần sau dùng cache. Để chỉ dùng TF-IDF và bằng chứng vụ việc, thêm `--no-embedding`.
 
 Xem [hướng dẫn dễ hiểu và kết quả chạy thật](details/event_database_guide.md).
 

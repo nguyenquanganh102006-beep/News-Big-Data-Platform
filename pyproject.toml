@@ -17,10 +17,8 @@ dependencies = [
     "scikit-learn>=1.4,<2",
     "redis>=5,<7",
     "streamlit>=1.50,<2",
+    "fastembed>=0.9.1,<1",
 ]
-
-[project.optional-dependencies]
-semantic = ["fastembed>=0.9.1,<1"]
 
 [build-system]
 requires = ["setuptools>=68"]
