@@ -30,10 +30,10 @@ class CandidateRetrievalTests(unittest.TestCase):
     def test_same_province_and_inclusive_window_on_both_sides(self):
         events = catalog([
             ("near", "Hà Nội", "2026-10-30T08:00:00+07:00"),
-            ("lower", "Hà Nội", "2026-10-29T12:00:00+07:00"),
-            ("upper", "Hà Nội", "2026-10-31T12:00:00+07:00"),
-            ("too_early", "Hà Nội", "2026-10-29T11:59:59.999999+07:00"),
-            ("too_late", "Hà Nội", "2026-10-31T12:00:00.000001+07:00"),
+            ("lower", "Hà Nội", "2026-10-28T12:00:00+07:00"),
+            ("upper", "Hà Nội", "2026-11-01T12:00:00+07:00"),
+            ("too_early", "Hà Nội", "2026-10-28T11:59:59.999999+07:00"),
+            ("too_late", "Hà Nội", "2026-11-01T12:00:00.000001+07:00"),
             ("other_province", "Hải Phòng", "2026-10-30T08:00:00+07:00"),
         ])
         result = retrieve_candidates(article(), events)
@@ -43,8 +43,8 @@ class CandidateRetrievalTests(unittest.TestCase):
 
     def test_configurable_radius_is_a_radius_not_total_window_width(self):
         events = catalog([("e", "Hà Nội", "2026-10-29T00:00:00+07:00")])
-        self.assertEqual(retrieve_candidates(article(), events).candidates.height, 0)
-        self.assertEqual(retrieve_candidates(article(), events, radius_hours=48).candidates.height, 1)
+        self.assertEqual(retrieve_candidates(article(), events, radius_hours=24).candidates.height, 0)
+        self.assertEqual(retrieve_candidates(article(), events).candidates.height, 1)
 
     def test_alias_unicode_case_and_whitespace_without_boundary_remapping(self):
         events = catalog([

@@ -95,7 +95,7 @@ bản sửa giả để thử trên dữ liệu thật; các trường hợp c�
 ### 3.1 — Tìm những vụ có thể liên quan
 
 Với mỗi bài mới, hệ thống tìm các sự kiện cùng tỉnh/thành, có mốc đăng bài
-trong khoảng 24 giờ trước đến 24 giờ sau. Nếu database đang rỗng thì không có
+trong khoảng 48 giờ trước đến 48 giờ sau. Nếu database đang rỗng thì không có
 ứng viên, và bài đủ thông tin có thể mở một sự kiện mới.
 
 ### 3.2 — Quyết định bài thuộc vụ nào
@@ -250,7 +250,7 @@ và có kế hoạch xử lý lại dữ liệu cũ; không xóa database để 
   [cập nhật VnExpress và lưu ý với database cũ](accident_extraction.md).
 - Mốc so sánh hiện là **ngày đăng bài**, chưa phải ngày tai nạn thực sự xảy ra.
   Trường `time_occurred` để trống khi chưa có bằng chứng, không điền ngày đăng thay thế.
-  Bài về cùng vụ nhưng đăng muộn hơn cửa sổ 24 giờ có thể bị tách thành sự kiện mới.
+  Bài về cùng vụ nhưng đăng muộn hơn bán kính 48 giờ có thể bị tách thành sự kiện mới.
 - Chưa có trường tên đường riêng từ bước trích xuất. Phần so địa điểm chi tiết
   đang dùng quận/huyện và phường/xã khi có.
 - Chưa đo độ đúng bằng tập bài thật được con người đánh dấu cùng/khác vụ.

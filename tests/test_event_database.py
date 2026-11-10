@@ -121,7 +121,7 @@ class EventDatabaseTests(unittest.TestCase):
         self.run_import(self.inputs({"test": [
             row("a", pub_date="2026-11-04T00:00:00Z"),
             row("b", pub_date="2026-11-04T23:00:00Z"),
-            row("c", pub_date="2026-11-05T22:00:00Z"),
+            row("c", pub_date="2026-11-06T01:00:00Z"),
         ]}))
         self.assertEqual(self.query("SELECT article_count FROM accident_events ORDER BY article_count"), [(1,), (2,)])
 

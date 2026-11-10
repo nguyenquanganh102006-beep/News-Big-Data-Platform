@@ -26,9 +26,9 @@ cùng tỉnh sau chuẩn hóa
 VÀ |anchor_published_at - published_at| <= radius_hours
 ```
 
-Mặc định `radius_hours=24`: lấy từ 24 giờ trước đến 24 giờ sau, bao gồm hai biên.
-Đây là cửa sổ rộng 48 giờ, khác với bán kính 48 giờ. DOCX có hai cách diễn đạt;
-phần này chọn hướng dẫn cụ thể `[-24h, +24h]`, cho phép truyền bán kính khác.
+Mặc định `radius_hours=48`: lấy từ 48 giờ trước đến 48 giờ sau, bao gồm hai biên.
+Đây là cửa sổ rộng 96 giờ (`[-48h, +48h]`), được mở rộng theo yêu cầu người dùng
+ngày 09/11/2026. Có thể truyền bán kính khác.
 
 - Tên tỉnh chuẩn hóa Unicode NFC, khoảng trắng, chữ hoa/thường và alias trong
   `PROVINCE_ALIASES` hiện có. Không tự suy tỉnh từ huyện hoặc đổi địa giới.
@@ -79,7 +79,7 @@ PowerShell:
 python -m unittest discover -s tests -p "test_event_retrieval.py" -v
 ```
 
-Test tự tạo bài/sự kiện giả, không tạo dữ liệu trong `data/`. Bao gồm biên ±24
+Test tự tạo bài/sự kiện giả, không tạo dữ liệu trong `data/`. Bao gồm biên ±48
 giờ, khác tỉnh, đổi bán kính, alias/Unicode, offset timezone, thứ tự ổn định,
 giữ nguyên đầu vào/schema, input rỗng, bài thiếu dữ liệu và kho sự kiện lỗi.
 
