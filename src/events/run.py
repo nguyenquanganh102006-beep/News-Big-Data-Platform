@@ -84,7 +84,8 @@ def run_events(input_paths=None, database_path=None, export_dir=None, config=Non
             effective = dict(stored)
             effective.update({a["article_key"] or ("unkeyed", a["input_fingerprint"]): a
                               for a in incoming})
-            model = TextModel([a["text"] for a in effective.values()])
+            model = TextModel([a["text"] for a in effective.values()],
+                              semantic_model=config.semantic_model, cache_dir=config.semantic_cache_dir)
             for article in incoming:
                 key = article["article_key"]
                 if key in updated_keys:
@@ -133,4 +134,13 @@ def run_events(input_paths=None, database_path=None, export_dir=None, config=Non
 
 
 if __name__ == "__main__":
-    run_events()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Match Silver reports using incident evidence and optional embeddings")
+    parser.add_argument("--semantic-model", help="FastEmbed model name; install the semantic extra first")
+    parser.add_argument("--model-cache", help="Directory for downloaded embedding models")
+    parser.add_argument("--database", type=Path, help="Use a fresh path to evaluate a new matcher version")
+    parser.add_argument("--export-dir", type=Path)
+    args = parser.parse_args()
+    run_events(database_path=args.database, export_dir=args.export_dir,
+               config=MatchConfig(semantic_model=args.semantic_model, semantic_cache_dir=args.model_cache))

@@ -5,6 +5,7 @@ import hashlib
 import json
 
 from .retrieval import normalize_province, utc_datetime
+from .profile import clean, incident_profile
 
 
 REQUIRED_ARTICLE_COLUMNS = {"article_key", "source", "link", "title", "pub_date", "province"}
@@ -60,10 +61,13 @@ def prepare_article(row: dict, reference: str = "") -> dict:
     for field in ("district", "ward"):
         if row.get(field) is not None and not isinstance(row[field], str):
             raise ValueError(f"{reference}: {field} must be text or null")
-    return {
+    body = row.get("content") or row.get("body") or ""
+    if not isinstance(body, str):
+        raise ValueError(f"{reference}: content/body must be text or null")
+    article = {
         "article_key": key, "source": row["source"], "url": url,
         "title": title, "description": description,
-        "text": f"{title}. {description}".strip(),
+        "text": clean(f"{title}. {description} {body}"),
         "published_at": published_at, "province": province,
         "district": row.get("district"), "ward": row.get("ward"),
         "vehicles": sorted(set(vehicles)), "fatalities": row.get("fatalities"),
@@ -71,3 +75,10 @@ def prepare_article(row: dict, reference: str = "") -> dict:
         "payload": json_text(row), "input_fingerprint": fingerprint(row),
         "reference": reference, "reasons": reasons,
     }
+    profile = incident_profile(article)
+    # Reconsider this soft upstream flag only with independent scene/vehicle
+    # evidence; preserve all hard data-quality and multi-incident flags.
+    if ("missing_incident_details" in reasons and profile["specific_incident"]
+            and any(profile["places"].values()) and vehicles):
+        article["reasons"] = [r for r in reasons if r != "missing_incident_details"]
+    return article

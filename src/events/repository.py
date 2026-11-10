@@ -12,6 +12,7 @@ from config import AGGREGATION_VERSION, MATCH_VERSION
 from .adapter import fingerprint, json_text
 from .aggregation import aggregate_members
 from .retrieval import retrieve_candidates, utc_datetime
+from .profile import clean, compare_profiles
 
 
 EVENT_NAMESPACE = UUID("c456c993-f92c-45a2-8b93-6046b1b9d2b8")
@@ -130,7 +131,9 @@ class EventRepository:
         for row in rows:
             row["vehicles"] = json.loads(row["vehicles"])
             row["flags"] = json.loads(row["flags"])
-            row["text"] = f'{row["title"]}. {row["description"]}'.strip()
+            payload = json.loads(row["extraction_payload"])
+            body = payload.get("content") or payload.get("body") or ""
+            row["text"] = clean(f'{row["title"]}. {row["description"]} {body}')
             row["field_timestamps"] = {
                 field: utc_datetime(value) for field, value in json.loads(row["field_timestamps"] or "{}").items()
             }
@@ -159,7 +162,9 @@ class EventRepository:
                     or has_field_conflict(article, field) != has_field_conflict(previous, field)):
                 timestamps[field] = now
         article["field_timestamps"] = timestamps
-        article["text"] = f'{article["title"]}. {article["description"]}'.strip()
+        payload = json.loads(article.get("payload") or article.get("extraction_payload") or "{}")
+        body = payload.get("content") or payload.get("body") or ""
+        article["text"] = clean(f'{article["title"]}. {article["description"]} {body}')
         # Never delete/reinsert the parent row: reviews reference this key.
         guard = (
             "AND NOT EXISTS (SELECT 1 FROM event_articles l WHERE l.article_key=articles.article_key) "
@@ -199,7 +204,7 @@ class EventRepository:
         )
 
     def find_candidates(self, article, config, articles):
-        radius = timedelta(hours=config.radius_hours)
+        radius = timedelta(hours=config.followup_radius_hours)
         catalog = self.connection.execute(
             "SELECT event_id, province, anchor_published_at FROM accident_events "
             "WHERE province = ? AND anchor_published_at BETWEEN ? AND ? "
@@ -207,7 +212,7 @@ class EventRepository:
             [article["province"], article["published_at"] - radius, article["published_at"] + radius],
         ).pl()
         # Keep the same 3.1 rules when moving from the fake catalog to DuckDB.
-        result = retrieve_candidates(article, catalog, radius_hours=config.radius_hours)
+        result = retrieve_candidates(article, catalog, radius_hours=config.followup_radius_hours)
         candidates = []
         for row in result.candidates.iter_rows(named=True):
             identity = self.connection.execute(
@@ -217,7 +222,15 @@ class EventRepository:
                 "SELECT article_key FROM event_articles WHERE event_id = ? ORDER BY article_key", [row["event_id"]]
             ).fetchall()
             members = [articles[key] for (key,) in keys]
-            candidates.append({**row, "text": articles[identity]["text"], "members": members,
+            delta = abs((article["published_at"] - row["anchor_published_at"]).total_seconds()) / 3600
+            evidence = compare_profiles(article, articles[identity])
+            if delta > config.radius_hours and not (
+                    evidence["same_incident_date"] and evidence["shared_places"]
+                    and not evidence["conflicts"]):
+                continue
+            candidates.append({**row, "anchor_article_key": identity,
+                               "text": articles[identity]["text"], "members": members,
+                               "retrieval_route": "publication_window" if delta <= config.radius_hours else "dated_followup",
                                "vehicles": sorted({v for member in members for v in member["vehicles"]})})
         return candidates
 

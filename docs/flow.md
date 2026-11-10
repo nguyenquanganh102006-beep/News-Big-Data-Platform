@@ -143,8 +143,10 @@ python -m events.inspect
 ```
 
 - 3.1 tìm cùng tỉnh trong khoảng ±24 giờ.
-- 3.2 so văn bản, địa điểm chi tiết, phương tiện và thời gian; gộp/tạo mới hoặc
-  giữ bài chờ xem xét nếu chưa đủ bằng chứng.
+- 3.2 lập hồ sơ vụ việc từ văn bản, so TF-IDF và embedding tùy chọn, đối chiếu
+  địa điểm/ngày xảy ra/đối tượng/phương tiện, kiểm tra mâu thuẫn với cả cụm rồi
+  gộp/tạo mới hoặc giữ bài chờ nếu chưa đủ bằng chứng. Quy trình và cách bật
+  embedding: [matching v2](details/event_matching_v2.md).
 - 3.3 lưu vào `data/gold/events/accident_events.duckdb`; xuất Parquet trong
   `data/gold/events/exports/`.
 
