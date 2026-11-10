@@ -96,3 +96,19 @@ hiển thị các sự kiện đã lưu. Nếu đã có bài trích xuất trong
 dùng `python -m main --step=5`.
 
 Xem [hướng dẫn dễ hiểu và kết quả chạy thật](details/event_database_guide.md).
+
+## 8. Redis và Streaming Consumer (4.1–4.2)
+
+Luồng streaming chạy riêng với luồng `main`. Cài Docker Desktop và khởi động
+engine, sau đó chạy tại gốc repository:
+
+```powershell
+docker compose up -d --wait redis
+docker compose exec -T redis redis-cli ping
+.venv/Scripts/python.exe -m streaming.run
+```
+
+`PONG` xác nhận Redis sẵn sàng. Biến môi trường Redis và database streaming
+được mô tả trong `.env.example`, đọc bởi `src/config/streaming.py`.
+Xem [luồng tổng thể](flow.md) và [hướng dẫn streaming](details/streaming.md)
+để gửi bài bằng Producer, kiểm tra dữ liệu và chạy test.

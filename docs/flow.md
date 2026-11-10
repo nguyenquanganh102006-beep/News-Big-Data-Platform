@@ -12,6 +12,10 @@ Không cần đặt thêm `PYTHONPATH`. Hướng dẫn dễ đọc và kết qu�
 
 Chi tiết: [luồng lọc](details/accident_filter/pipeline.md).
 
+Luồng streaming 4.1–4.2 chạy riêng: bài Bronze → Producer → Redis List →
+làm sạch/lọc/trích xuất → tìm ứng viên/matching → sự kiện tạm trong DuckDB.
+Xem mục 7 bên dưới; `main --step` vẫn dành cho luồng xử lý hiện có.
+
 ## Tiêu chí và đánh giá bộ lọc tai nạn
 
 Xem [tiêu chí](details/accident_filter/criteria.md) và [cách sinh kết quả đánh giá](details/accident_filter/rules_v1.md). Bộ nhãn trợ lý tự gán và báo cáo điểm số cũ đã được loại bỏ. Đánh giá cần dữ liệu tham chiếu được kiểm duyệt, truyền qua `--samples`; kết quả sinh ra nằm trong `data/evaluation/accident_filter/` và không commit vào Git.
@@ -34,6 +38,7 @@ News-Big-Data-Platform/
     |-- filters/            # Accident filtering
     |-- extractors/         # Accident information extraction
     |-- events/             # Candidate retrieval, matching and DuckDB storage
+    |-- streaming/          # Redis producer, consumer and provisional events
     |-- main.py             # Main flow
 ```
 
@@ -142,7 +147,7 @@ python -m main --step=5
 python -m events.inspect
 ```
 
-- 3.1 tìm cùng tỉnh trong khoảng ±24 giờ.
+- 3.1 tìm cùng tỉnh trong khoảng ±48 giờ theo cấu hình hiện tại.
 - 3.2 so văn bản, địa điểm chi tiết, phương tiện và thời gian; gộp/tạo mới hoặc
   giữ bài chờ xem xét nếu chưa đủ bằng chứng.
 - 3.3 lưu vào `data/gold/events/accident_events.duckdb`; xuất Parquet trong
@@ -161,3 +166,56 @@ của phần 3. Gold chỉ được ghi bởi bước sự kiện, không chứa
 
 Chi tiết: [bộ lọc ứng viên 3.1](details/event_retrieval.md) và
 [hướng dẫn database](details/event_database_guide.md).
+
+### 7. Streaming (4.1 Redis Queue, 4.2 Streaming Consumer)
+
++ Folder relationship structure:
+
+```text
+News-Big-Data-Platform/
+|-- compose.yaml                 # Redis local, persistent volume and AOF
+|-- src/
+    |-- config/
+        |-- streaming.py         # Redis and streaming database configuration
+    |-- streaming/
+        |-- producer.py          # Enqueue Bronze articles
+        |-- message.py           # Validate JSON and article identity
+        |-- queue.py             # Claim, ACK, recovery and retry
+        |-- pipeline.py          # Reuse cleaning, filtering, extraction and matching
+        |-- repository.py        # Isolated provisional tables
+        |-- consumer.py          # Consumer loop and writer lock
+        |-- run.py               # Streaming entry point
+|-- tests/test_streaming.py
+|-- scripts/smoke_streaming.py    # Replay Bronze into an isolated test database
+|-- docs/details/streaming.md
+```
+
++ Input: một bài theo schema RSS Bronze, kèm `source` thuộc `vnexpress`,
+  `vietnamplus` hoặc `tuoitre`. Crawler gọi `enqueue_article()` sau khi lưu
+  Bronze; hiện chưa tự động thay luồng crawler cũ.
++ Config: `src/config/streaming.py`, biến môi trường trong `.env.example`:
+  `REDIS_URL`, `REDIS_ARTICLE_QUEUE`, `STREAM_DATABASE_PATH`.
++ Run pipeline từ gốc repository, sau khi cài `pip install -e .`:
+
+```powershell
+docker compose up -d --wait redis
+docker compose exec -T redis redis-cli ping
+.venv/Scripts/python.exe -m streaming.run
+```
+
+Terminal khác gửi một file JSON Bronze:
+
+```powershell
+.venv/Scripts/python.exe -m streaming.producer article.json
+```
+
++ Output: mặc định `data/gold/streaming/provisional.duckdb`, gồm
+  `provisional_events`, `provisional_articles`, `provisional_event_articles`,
+  review và receipt chống xử lý lặp. Không sửa bảng sự kiện chính thức phần 3.
++ Chỉ chạy một Consumer cho mỗi cặp queue/database. Ctrl+C dừng an toàn sau
+  bài hiện tại. Message lỗi được retry hoặc giữ trong `<queue>:dead`.
++ `python -m streaming.consumer` vẫn chạy được như lệnh trực tiếp tương đương.
+  Chưa triển khai Batch 4.3 hoặc chuẩn hóa matching 4.4.
+
+Contract JSON, truy vấn DB, kiểm thử và giới hạn:
+[hướng dẫn streaming](details/streaming.md).
