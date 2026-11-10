@@ -157,9 +157,12 @@ python -m main --step=5
 python -m events.inspect
 ```
 
-- 3.1 tìm cùng tỉnh trong khoảng ±48 giờ theo cấu hình hiện tại.
-- 3.2 so văn bản, địa điểm chi tiết, phương tiện và thời gian; gộp/tạo mới hoặc
-  giữ bài chờ xem xét nếu chưa đủ bằng chứng.
+- 3.1 tìm ứng viên cùng tỉnh trong bán kính đăng bài ±48 giờ; tin theo dõi đăng
+  muộn có thể được xét xa hơn khi trùng ngày vụ việc và địa điểm cụ thể, không
+  có mâu thuẫn.
+- 3.2 lập hồ sơ vụ việc, so TF-IDF/embedding cùng địa điểm, ngày xảy ra, đối tượng
+  và phương tiện; kiểm tra bằng chứng với từng thành viên của cụm. Bài mơ hồ vào
+  review. Chi tiết: [matching v2](details/event_matching_v2.md).
 - 3.3 lưu vào `data/gold/events/accident_events.duckdb`; xuất Parquet trong
   `data/gold/events/exports/`.
 

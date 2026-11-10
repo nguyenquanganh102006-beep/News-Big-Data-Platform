@@ -19,6 +19,9 @@ dependencies = [
     "streamlit>=1.50,<2",
 ]
 
+[project.optional-dependencies]
+semantic = ["fastembed>=0.9.1,<1"]
+
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
