@@ -10,8 +10,8 @@ from .main import DATA_GOLD_DIR
 from .extractors import EXTRACT_OUTPUT_DIR
 
 
-# A 24-hour radius means a 48-hour-wide window, including both endpoints.
-RETRIEVAL_RADIUS_HOURS = 24
+# A 48-hour radius means a 96-hour-wide window, including both endpoints.
+RETRIEVAL_RADIUS_HOURS = 48
 RETRIEVAL_EVENT_COLUMNS = ("event_id", "province", "anchor_published_at")
 EVENT_INPUT_DIR = Path(EXTRACT_OUTPUT_DIR)
 EVENT_DATABASE_PATH = Path(DATA_GOLD_DIR) / "events" / "accident_events.duckdb"

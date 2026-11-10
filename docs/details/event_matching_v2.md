@@ -46,7 +46,7 @@ Thời gian và địa danh vẫn được trích bằng luật, chưa phải b�
 
 ### 3. Tìm ứng viên và tin theo dõi đăng muộn
 
-- Cửa sổ thông thường: cùng tỉnh, ±24 giờ theo giờ đăng của bài đại diện.
+- Cửa sổ thông thường: cùng tỉnh, ±48 giờ theo giờ đăng của bài đại diện.
 - Cửa sổ tin theo dõi: tối đa ±168 giờ, **chỉ nhận thêm ứng viên khi trùng ngày vụ việc được nhắc rõ và trùng địa điểm có tên, không có mâu thuẫn**.
 - Khi hai bài trùng ngày xảy ra, thành phần thời gian không phạt chỉ vì giờ đăng cách xa nhau.
 - Bài đăng muộn nhưng không nói rõ thời điểm/địa điểm không được tự nối vào vụ cũ.

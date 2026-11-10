@@ -142,7 +142,7 @@ python -m main --step=5
 python -m events.inspect
 ```
 
-- 3.1 tìm cùng tỉnh trong khoảng ±24 giờ.
+- 3.1 tìm cùng tỉnh trong khoảng ±48 giờ theo ngày đăng.
 - 3.2 lập hồ sơ vụ việc từ văn bản, so TF-IDF và embedding mặc định, đối chiếu
   địa điểm/ngày xảy ra/đối tượng/phương tiện, kiểm tra mâu thuẫn với cả cụm rồi
   gộp/tạo mới hoặc giữ bài chờ nếu chưa đủ bằng chứng. Quy trình và tùy chọn tắt
