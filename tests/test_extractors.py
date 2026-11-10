@@ -192,7 +192,7 @@ class ExtractionTests(unittest.TestCase):
             input_path = source / "accident.parquet"
             pl.DataFrame({"title": ["Hai xe máy va chạm, bốn người tử vong"], "article_key": ["a"]}).write_parquet(input_path)
             original = input_path.read_bytes()
-            output = Path(tmp, "gold")
+            output = Path(tmp, "silver", "accidents")
             with patch("extractors.accident.FILTERED_DATA_DIR", str(source.parent)), patch("extractors.accident.EXTRACT_OUTPUT_DIR", str(output)), patch("extractors.accident.EXTRACT_SOURCES", ("test",)):
                 extract_filtered_files()
                 extract_filtered_files()
