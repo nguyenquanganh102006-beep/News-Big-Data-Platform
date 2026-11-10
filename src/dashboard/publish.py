@@ -69,8 +69,11 @@ def publish(data_root=DATA_DIR, artifacts_root=None):
                     raise ValueError(f"Conflicting Bronze snapshot: {identity}")
                 files[identity] = (path, digest)
         rows = {}
+        bronze_records = 0
         for (source, filename), (path, _) in sorted(files.items(), key=lambda item: (item[0][1], item[0][0])):
-            for row in pl.read_parquet(path).iter_rows(named=True):
+            snapshot = pl.read_parquet(path)
+            bronze_records += snapshot.height
+            for row in snapshot.iter_rows(named=True):
                 url = dedup_normalize_article_url(row.get("link"))
                 key = dedup_make_article_key(source, url)
                 if not key:
@@ -88,9 +91,15 @@ def publish(data_root=DATA_DIR, artifacts_root=None):
         catalog = detect_duplicate_articles(catalog)
         rows = {row["article_key"]: row for row in catalog.iter_rows(named=True)}
         catalog.write_parquet(generation / "articles.parquet")
+        unique_catalog = catalog.filter(~pl.col("is_duplicate").fill_null(False))
+        filter_counts = {
+            label: int(unique_catalog.filter(pl.col("accident_label") == label).height)
+            for label in ("accident", "uncertain", "not_accident")
+        }
         # Reuse extracted history from all RSS sources, retaining the most recent
         # extraction for each identity, then apply the current scope before matching.
         paths = {}
+        extracted_records = 0
         for source in EXTRACT_SOURCES:
             frames, seen = [], set()
             for base in inputs:
@@ -106,16 +115,39 @@ def publish(data_root=DATA_DIR, artifacts_root=None):
                        if r['source'] == source and r['accident_label'] == 'accident'
                        and not r['is_duplicate']]
             frame = frame.filter(pl.col("article_key").is_in(allowed))
+            extracted_records += frame.height
             path = generation / "silver" / "accidents" / f"{source}.parquet"
             path.parent.mkdir(parents=True, exist_ok=True)
             frame.write_parquet(path); paths[source] = path
         stats = run_batch(paths, generation / "gold" / "batch" / "canonical.duckdb")
         duplicate_articles = int(catalog.filter(pl.col("is_duplicate")).height)
+        batch_counts = stats["counts"]
+        pipeline_counts = {
+            "bronze": {
+                "records": int(bronze_records), "snapshots": len(files),
+                "sources": len({source for source, _ in files}),
+            },
+            "silver": {"records": int(catalog.height)},
+            "content_dedup": {
+                "input": int(catalog.height), "duplicates": duplicate_articles,
+                "retained": int(catalog.height - duplicate_articles),
+            },
+            "filter": {"records": int(unique_catalog.height), **filter_counts},
+            "extraction": {"records": int(extracted_records), "sources": len(paths)},
+            "gold": {
+                "input": int(stats["input"]), "articles": int(batch_counts["articles"]),
+                "events": int(batch_counts["accident_events"]),
+                "event_articles": int(batch_counts["event_articles"]),
+                "pending_reviews": int(batch_counts["pending_reviews"]),
+                "unassigned_articles": int(batch_counts["unassigned_articles"]),
+            },
+        }
         metadata = {"path": str(generation.relative_to(archive)), "articles": catalog.height,
                     "unique_articles": catalog.height - duplicate_articles,
                     "sources": catalog['source'].n_unique(), "date_min": str(catalog['pub_date'].min()),
                     "date_max": str(catalog['pub_date'].max()),
                     "duplicate_articles": duplicate_articles,
+                    "pipeline_counts": pipeline_counts,
                     "batch": stats,
                     "coverage": "Article catalog, accident filtering, extraction, and event matching cover all seven RSS sources."}
         (generation / "manifest.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")

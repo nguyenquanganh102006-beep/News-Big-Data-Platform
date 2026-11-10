@@ -42,6 +42,18 @@ def load_articles(root):
     return (pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()), errors
 
 
+def load_pipeline_counts(root):
+    """Read per-stage row counts from the manifest for the published snapshot."""
+    manifest = Path(root) / "manifest.json"
+    if not manifest.is_file():
+        return None
+    try:
+        counts = json.loads(manifest.read_text(encoding="utf-8")).get("pipeline_counts")
+    except (OSError, ValueError, TypeError):
+        return None
+    return counts if isinstance(counts, dict) else None
+
+
 def discover_databases(root):
     gold = Path(root) / "gold"
     return {str(path.relative_to(gold)): path for path in sorted(gold.rglob("*.duckdb"))

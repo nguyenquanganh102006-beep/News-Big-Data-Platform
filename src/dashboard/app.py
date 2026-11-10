@@ -3,7 +3,10 @@ import pandas as pd
 import streamlit as st
 
 from config import DATA_DIR
-from dashboard.data import discover_datasets, discover_databases, load_articles, read_database, filter_articles
+from dashboard.data import (
+    discover_datasets, discover_databases, load_articles, load_pipeline_counts,
+    read_database, filter_articles,
+)
 from dashboard.statistics import article_periods, source_statistics, local_times, event_periods
 
 st.set_page_config(page_title="News Observatory · Tai nạn giao thông", page_icon="📰", layout="wide")
@@ -137,7 +140,9 @@ def main():
     today_articles = metric_articles.loc[article_dates.eq(today_date)]
     show_article_metrics(f"Hôm nay · {today_date:%d/%m/%Y}", today_articles)
     st.caption("Các chỉ số đếm bài báo, không phải số vụ tai nạn. Hai hàng áp dụng bộ lọc nguồn, kết quả và từ khóa; hàng tổng hợp luôn tính trên mọi ngày, hàng hôm nay theo giờ Việt Nam.")
-    overview, stats_tab, news, events_tab, reviews_tab = st.tabs(["Tổng quan", "Thống kê thời gian", "Bài báo", "Sự kiện", "Chờ review"])
+    overview, stats_tab, pipeline_tab, news, events_tab, reviews_tab = st.tabs(
+        ["Tổng quan", "Thống kê thời gian", "Luồng dữ liệu", "Bài báo", "Sự kiện", "Chờ review"]
+    )
 
     with stats_tab:
         st.subheader("Nhịp tin tức theo thời gian")
@@ -190,6 +195,52 @@ def main():
         invalid = int(local_times(filtered).isna().sum())
         if invalid:
             st.caption(f"{invalid} bài thiếu ngày hợp lệ không được đưa vào thống kê thời gian.")
+
+    with pipeline_tab:
+        st.subheader("Số bản ghi sau từng bước")
+        st.caption(
+            "Số liệu của snapshot mới nhất đã publish, tính trên toàn bộ lịch sử "
+            "và không áp dụng bộ lọc ở thanh bên."
+        )
+        counts = load_pipeline_counts(root)
+        if not counts:
+            st.info("Snapshot hiện tại chưa có thống kê theo bước. Bấm ‘Làm mới dữ liệu’ ở thanh bên để tạo lại.")
+        else:
+            bronze = counts.get("bronze", {})
+            silver = counts.get("silver", {})
+            dedup = counts.get("content_dedup", {})
+            filtered_counts = counts.get("filter", {})
+            extraction = counts.get("extraction", {})
+            gold = counts.get("gold", {})
+            steps = pd.DataFrame([
+                {"Bước": "Bronze · snapshot crawl", "Số bản ghi": bronze.get("records", 0),
+                 "Chi tiết": f"{bronze.get('snapshots', 0):,} snapshot · {bronze.get('sources', 0)} nguồn; có thể lặp bài qua các lần crawl"},
+                {"Bước": "Silver · gộp theo URL", "Số bản ghi": silver.get("records", 0),
+                 "Chi tiết": "Bài duy nhất theo nguồn và URL chuẩn hóa"},
+                {"Bước": "Sau phát hiện trùng nội dung", "Số bản ghi": dedup.get("retained", 0),
+                 "Chi tiết": f"Đầu vào {dedup.get('input', 0):,} · đánh dấu trùng {dedup.get('duplicates', 0):,}"},
+                {"Bước": "Sau lọc phạm vi tai nạn", "Số bản ghi": filtered_counts.get("records", 0),
+                 "Chi tiết": (f"Tai nạn {filtered_counts.get('accident', 0):,} · cần xem xét "
+                              f"{filtered_counts.get('uncertain', 0):,} · loại "
+                              f"{filtered_counts.get('not_accident', 0):,}")},
+                {"Bước": "Sau trích xuất", "Số bản ghi": extraction.get("records", 0),
+                 "Chi tiết": f"Bài tai nạn có dữ liệu trích xuất · {extraction.get('sources', 0)} nguồn"},
+                {"Bước": "Gold · bài đưa vào matching", "Số bản ghi": gold.get("input", 0),
+                 "Chi tiết": f"Đã lưu {gold.get('articles', 0):,} bài trong kho canonical"},
+                {"Bước": "Gold · bài gán vào sự kiện", "Số bản ghi": gold.get("event_articles", 0),
+                 "Chi tiết": f"{gold.get('events', 0):,} sự kiện · chưa gán {gold.get('unassigned_articles', 0):,}"},
+                {"Bước": "Gold · chờ review matching", "Số bản ghi": gold.get("pending_reviews", 0),
+                 "Chi tiết": "Các bài matching chưa tự động gán vào sự kiện"},
+            ])
+            st.dataframe(
+                steps, hide_index=True, width="stretch",
+                column_config={"Số bản ghi": st.column_config.NumberColumn("Số bản ghi", format="%d")},
+            )
+            st.caption(
+                "Bronze đếm dòng trong các snapshot crawl đã gộp snapshot trùng tên; "
+                "Silver gộp bài theo URL. Các bước sau đếm đầu ra thực tế của khử trùng "
+                "nội dung, lọc, trích xuất và batch matching."
+            )
 
     with overview:
         left, right = st.columns([1.3, 1])
