@@ -1,10 +1,11 @@
-"""Lexical and optional multilingual sentence representations for a whole run."""
+"""Lexical and multilingual sentence representations for a whole run."""
 
 import hashlib
 from importlib.metadata import version
 from pathlib import Path
 import sklearn
 from sklearn.feature_extraction.text import TfidfVectorizer
+from config import DEFAULT_SEMANTIC_MODEL
 
 from .adapter import fingerprint
 from .profile import clean, PROFILE_VERSION
@@ -35,7 +36,7 @@ def split_for_encoder(text, token_count, limit=120):
 
 
 class TextModel:
-    def __init__(self, texts, semantic_model=None, cache_dir=None):
+    def __init__(self, texts, semantic_model=DEFAULT_SEMANTIC_MODEL, cache_dir=None):
         corpus = sorted(set(clean(text) for text in texts if text and text.strip()))
         self.vectorizer = TfidfVectorizer(
             analyzer="char_wb", ngram_range=(3, 5), sublinear_tf=True,
@@ -58,7 +59,8 @@ class TextModel:
                 from fastembed import TextEmbedding
                 import numpy as np
             except ImportError as error:
-                raise RuntimeError("Semantic matching requires pip install -e '.[semantic]'") from error
+                raise RuntimeError("Embedding dependency missing; run python -m pip install -e . "
+                                   "or explicitly select --no-embedding") from error
             path = str(Path(cache_dir or "data/models/fastembed").resolve())
             key = semantic_model, path
             if key not in _ENCODERS:

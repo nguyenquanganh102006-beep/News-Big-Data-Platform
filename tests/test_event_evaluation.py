@@ -6,6 +6,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 import polars as pl
+from config import MatchConfig
 
 from events.evaluate import evaluate
 
@@ -27,7 +28,7 @@ class EventEvaluationTests(unittest.TestCase):
             labels.write_text(json.dumps({'provenance': 'Unit test of metric accounting only',
                                          'pairs': [{'left': 'a', 'right': 'b', 'same_event': True}]}))
             with redirect_stdout(StringIO()):
-                result = evaluate(inputs, root / 'output', labels)
+                result = evaluate(inputs, root / 'output', labels, config=MatchConfig(semantic_model=None))
             self.assertEqual(result['metrics']['fn'], 1)
             self.assertEqual(result['metrics']['abstained_pairs'], 1)
             self.assertEqual(result['metrics']['recall_including_abstentions'], 0)

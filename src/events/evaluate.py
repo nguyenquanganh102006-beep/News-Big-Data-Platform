@@ -15,6 +15,7 @@ import duckdb
 from config import MatchConfig
 from .adapter import json_text
 from .run import load_silver_articles, run_events
+from .cli import add_matching_arguments, matching_config
 
 
 def evaluate(input_dir, output_dir, labels_path=None, config=None):
@@ -94,11 +95,10 @@ def main():
     parser.add_argument('--input-dir', type=Path, required=True)
     parser.add_argument('--output-dir', type=Path, required=True, help='New, non-existing evaluation directory')
     parser.add_argument('--labels', type=Path)
-    parser.add_argument('--semantic-model')
-    parser.add_argument('--model-cache')
+    add_matching_arguments(parser)
     args = parser.parse_args()
     result = evaluate(args.input_dir, args.output_dir, args.labels,
-                      MatchConfig(semantic_model=args.semantic_model, semantic_cache_dir=args.model_cache))
+                      matching_config(args))
     print(json_text({'first': result['first'], 'metrics': result['metrics']}))
 
 

@@ -19,6 +19,7 @@ EVENT_EXPORT_DIR = EVENT_DATABASE_PATH.parent / "exports"
 MATCH_VERSION = "hybrid-evidence-v2"
 AGGREGATION_VERSION = "latest-field-v1"
 MATCH_WEIGHTS = {"text": 0.35, "location": 0.20, "identity": 0.25, "vehicles": 0.10, "time": 0.10}
+DEFAULT_SEMANTIC_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
 
 @dataclass(frozen=True)
@@ -30,7 +31,7 @@ class MatchConfig:
     min_coverage: float = 0.70
     min_text_score: float = 0.60
     min_evidence_text_score: float = 0.25
-    semantic_model: str | None = None
+    semantic_model: str | None = DEFAULT_SEMANTIC_MODEL
     semantic_cache_dir: str | None = None
     followup_radius_hours: float = 168
 

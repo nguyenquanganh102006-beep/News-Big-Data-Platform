@@ -8,7 +8,7 @@ from unittest.mock import patch
 import duckdb
 import polars as pl
 
-from config import DATA_SILVER_DIR, EVENT_INPUT_DIR, EXTRACT_OUTPUT_DIR
+from config import DATA_SILVER_DIR, EVENT_INPUT_DIR, EXTRACT_OUTPUT_DIR, MatchConfig
 from extractors import extract_filtered_files
 from events.run import run_events
 
@@ -49,8 +49,8 @@ class EventDataLayersTests(unittest.TestCase):
                  patch("events.run.EVENT_DATABASE_PATH", database), \
                  patch("events.run.EVENT_EXPORT_DIR", gold / "exports"), \
                  redirect_stdout(StringIO()):
-                first = run_events()
-                second = run_events()
+                first = run_events(config=MatchConfig(semantic_model=None))
+                second = run_events(config=MatchConfig(semantic_model=None))
             self.assertEqual(first["new_event"], 1)
             self.assertEqual(second["already_processed"], 1)
             self.assertEqual(first["database"], second["database"])

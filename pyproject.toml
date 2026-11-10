@@ -15,10 +15,8 @@ dependencies = [
     "duckdb>=1.1,<2",
     "pytz",
     "scikit-learn>=1.4,<2",
+    "fastembed>=0.9.1,<1",
 ]
-
-[project.optional-dependencies]
-semantic = ["fastembed>=0.9.1,<1"]
 
 [build-system]
 requires = ["setuptools>=68"]
