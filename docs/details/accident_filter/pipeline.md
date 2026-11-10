@@ -2,9 +2,9 @@
 
 ## Mục đích và phạm vi
 
-Áp dụng nguyên bộ `rules-v1` đã chốt vào dữ liệu Silver tích lũy. Dùng `title` và câu đầu `description`, không tải thân bài, không thay đổi luật sau đánh giá. Mỗi dòng là một bài báo, không phải một vụ tai nạn độc lập. Bước filter không trích xuất thông tin; bước tiếp theo được mô tả tại [task24 — trích xuất](../accident_extraction.md).
+Áp dụng bộ `rules-v3-road` vào dữ liệu Silver tích lũy. Dùng `title` và đoạn mở đầu `description`, không tải thân bài. Mỗi dòng là một bài báo, không phải một vụ tai nạn độc lập. Bước filter không trích xuất thông tin; bước tiếp theo được mô tả tại [task24 — trích xuất](../accident_extraction.md).
 
-Nguồn đang hỗ trợ: VnExpress, VietnamPlus, Tuổi Trẻ, tương ứng 3 preprocessor hiện có. Crawler vẫn lấy 7 nguồn nhưng 4 nguồn còn lại chưa có Silver nên chưa được lọc trong luồng này.
+Luồng hỗ trợ cả 7 nguồn RSS. VnExpress, VietnamPlus và Tuổi Trẻ dùng preprocessor riêng; Dân Trí, Thanh Niên, Báo Xây Dựng và Tiền Phong dùng preprocessor RSS chung. Filter và extraction dùng cùng bộ luật cho cả 7 nguồn.
 
 ## Cài đặt và chạy
 
@@ -23,7 +23,7 @@ Chạy toàn bộ luồng:
 .\.venv\Scripts\python.exe -m main
 ```
 
-Thứ tự: RSS → file Bronze → preprocess + dedup batch/lịch sử → Silver tích lũy → phân loại → lưu output lọc. Nếu một bước lỗi, pipeline dừng; không chạy bước tiếp theo.
+Thứ tự: RSS → file Bronze → preprocess + khử trùng URL → Silver tích lũy → Task 2.2 khử trùng nội dung → phân loại → lưu output lọc. Task 2.2 dùng TF-IDF + cosine trên tiêu đề/mô tả, mặc định ngưỡng `>= 0.85` trong cửa sổ 24 giờ. Bài trùng được gắn cờ/lưu ở `data/silver/deduplicated/`; chỉ bài gốc đi vào filter. Nếu một bước lỗi, pipeline dừng; không chạy bước tiếp theo. Xem [Task 2.2 — Duplicate Article Detection](../content_duplicate_detection.md).
 
 Đã có Bronze, chạy preprocessors rồi filters:
 
@@ -42,20 +42,18 @@ Các lệnh cũ `python -m crawlers.run` và `python -m preprocessors.run` vẫn
 
 ## Đường dẫn và dữ liệu đầu ra
 
-Input `data/silver/<source>.parquet` được đọc toàn bộ. Không lấy riêng DataFrame bài mới do preprocessor trả về: nếu batch không có bài mới vẫn phải giữ các bài đã chọn trước đó.
+Task 2.2 đọc toàn bộ `data/silver/<source>.parquet` của 7 nguồn để so sánh chéo nguồn. Filter sau đó đọc `data/silver/deduplicated/<source>.parquet` và chỉ phân loại bài gốc. Không lấy riêng DataFrame bài mới do preprocessor trả về: nếu batch không có bài mới vẫn phải giữ lịch sử đã chọn trước đó.
 
 ```text
 data/silver/filtered/
-  vnexpress/
+  <source>/
     classified.parquet
     accident.parquet
     not_accident.parquet
     uncertain.parquet
-  vietnamplus/               # cấu trúc tương tự
-  tuoitre/                   # cấu trúc tương tự
 ```
 
-- `classified.parquet`: toàn bộ Silver nguồn đó kèm nhãn và lý do.
+- `classified.parquet`: toàn bộ bài gốc của nguồn kèm nhãn và lý do. Bài trùng được giữ ở `silver/deduplicated/`, không lặp trong các partition filter.
 - `accident.parquet`: bài được chọn để chuyển sang bước trích xuất sau này.
 - `not_accident.parquet`: bài không phù hợp, vẫn lưu để kiểm tra chọn nhầm/bỏ sót.
 - `uncertain.parquet`: hàng chờ xem xét, chưa coi là bài tai nạn chắc chắn.
@@ -67,7 +65,7 @@ Giữ các cột đầu vào (kể cả article_key/source/link), bổ sung ho�
 | accident_label | accident / not_accident / uncertain |
 | filter_reason | Mã luật quyết định |
 | filter_evidence | Tiêu đề hoặc lead đã chuẩn hóa dùng ở nhánh quyết định |
-| filter_version | rules-v1 |
+| filter_version | rules-v3-road |
 
 Output lọc là bản dựng lại từ Silver hiện tại, được thay thế mỗi lần chạy; không append gây trùng qua các lần chạy. File của nhóm không có bài vẫn được ghi rỗng với schema đầy đủ để không giữ kết quả cũ. Không sửa input Silver. Thư mục output tự tạo; data đã có trong `.gitignore`.
 
@@ -78,12 +76,13 @@ Ghi file tạm rồi thay thế từng file sau khi ghi xong. Bốn file không 
 Log thống kê chỉ in khi `DEBUG=True`.
 
 ```text
-[Filter] source=vnexpress, input=86, accident=2, not_accident=78, uncertain=6
+[Content dedup] input=..., duplicates=..., retained=...
+[Filter] source=vnexpress, input=..., accident=..., not_accident=..., uncertain=...
 ```
 
-Luôn có `input = accident + not_accident + uncertain`. Đây là số bài trên Silver tích lũy, không phải số vụ hoặc số bài mới của batch.
+Với mỗi nguồn, luôn có `input = accident + not_accident + uncertain`. Đây là số bài gốc được chuyển vào filter sau khi bỏ các bản trùng, không phải số vụ hoặc số bài mới của batch.
 
-- Thiếu một trong 3 file Silver: báo đường dẫn thiếu trước khi bắt đầu ghi output; chạy preprocessors trước.
+- Thiếu một trong 7 file Silver: báo đường dẫn thiếu trước khi bắt đầu ghi output; chạy preprocessors trước.
 - Thiếu cột title: báo lỗi schema, không đoán nội dung từ các cột khác.
 - Title null/rỗng: nhãn uncertain. Description thiếu: dùng tiêu đề.
 - Silver rỗng nhưng có schema title: tạo output rỗng.

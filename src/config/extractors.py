@@ -8,7 +8,28 @@ from .filters import FILTER_SOURCES
 
 EXTRACT_SOURCES = FILTER_SOURCES
 EXTRACT_OUTPUT_DIR = os.path.join(DATA_SILVER_DIR, "accidents")
-EXTRACT_VERSION = "rules-v2"
+EXTRACT_VERSION = "rules-v2-all-rss-v1"
+VNEXPRESS_EXTRACT_VERSION = "rules-v2+vnexpress-dateline-v1"
+VNEXPRESS_LOCATION_SELECTOR = "p.description span.location-stamp"
+VNEXPRESS_FETCH_TIMEOUT = (5, 20)
+VNEXPRESS_MAX_HTML_BYTES = 2_000_000
+VNEXPRESS_REQUEST_DELAY = 1.0
+
+
+@dataclass(frozen=True)
+class ArticleLocation:
+    status: str
+    province: str | None = None
+    text: str | None = None
+    url: str | None = None
+
+
+ARTICLE_LOCATION_SCHEMA = {
+    "article_location_text": pl.String,
+    "article_location_status": pl.String,
+    "article_location_url": pl.String,
+}
+
 # Text vocabulary includes historical names. No administrative remapping is inferred.
 PROVINCE_ALIASES = {
     "Hà Nội": ("Hà Nội",), "Hải Phòng": ("Hải Phòng",),
