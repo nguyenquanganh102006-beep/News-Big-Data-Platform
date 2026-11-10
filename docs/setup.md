@@ -94,7 +94,7 @@ python -m events.inspect
 `main` tự tạo thư mục dữ liệu. Lệnh đầu lấy RSS và xử lý đến database; lệnh sau
 hiển thị các sự kiện đã lưu. Nếu đã có bài trích xuất trong
 `data/silver/accidents/` và chỉ muốn chạy phần sự kiện,
-dùng `python -m main --step=5`. Bước này mặc định dùng embedding; lần đầu tải model, các lần sau dùng cache. Để chỉ dùng TF-IDF và bằng chứng vụ việc, thêm `--no-embedding`.
+dùng `python -m main --step=5`. Bước này mặc định dùng embedding; lần đầu tải model, các lần sau dùng cache tại `data/models/fastembed`. Để chỉ dùng TF-IDF và bằng chứng vụ việc, thêm `--no-embedding`.
 
 Xem [hướng dẫn dễ hiểu và kết quả chạy thật](details/event_database_guide.md).
 

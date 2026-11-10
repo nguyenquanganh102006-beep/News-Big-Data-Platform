@@ -72,7 +72,9 @@ class ArticleProcessor:
                 stored = repo.read_articles()
                 repo.insert_article(article)
                 stored[key] = article
-                model = TextModel([a["text"] for a in stored.values()])
+                model = TextModel([a["text"] for a in stored.values()],
+                                  semantic_model=self.config.semantic_model,
+                                  cache_dir=self.config.semantic_cache_dir)
                 decision = self.matching.decide(article, repo, stored, model)
                 status = decision["decision"]
                 if status == "needs_review":

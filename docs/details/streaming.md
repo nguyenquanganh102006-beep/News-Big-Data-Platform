@@ -91,7 +91,9 @@ Consumer chạy liên tục, chờ đến khi Redis có bài mới. Mỗi bài �
    VnExpress có thêm bước đọc nhãn tỉnh/thành ở đầu trang bài.
 5. Gọi interface matching dùng chung của phần 3, tìm vụ cùng tỉnh trong khoảng
    **24 giờ trước đến đúng mốc đăng bài** (gồm hai biên, loại candidate tương lai),
-   rồi so nội dung, địa điểm, phương tiện và thời gian.
+   rồi so TF-IDF, embedding mặc định, hồ sơ vụ việc, địa điểm, phương tiện và thời gian.
+   Tin theo dõi đăng muộn đến tối đa 168 giờ chỉ được xét khi cùng ngày vụ việc,
+   cùng địa điểm có tên và không có mâu thuẫn.
 6. Lưu bài và kết quả vào DuckDB.
 
 Ví dụ một bài nói về xe tải va chạm xe máy tại Hà Nội:
@@ -104,9 +106,11 @@ Ví dụ một bài nói về xe tải va chạm xe máy tại Hà Nội:
 | Gửi lại bài đã xử lý | Không tạo thêm bài, vụ hoặc liên kết |
 | Bài chỉ nói về quy định giao thông | Không tạo sự kiện tai nạn |
 
-Thuật toán và ngưỡng matching giữ như phần 3, không viết lại cách gom vụ.
-Điểm khớp mặc định cần đạt 0.75, đồng thời thỏa các điều kiện về bằng chứng và
-độ cách biệt với ứng viên khác. Không mặc định giống tiêu đề là cùng một vụ.
+Matching dùng chung hồ sơ bằng chứng và `MatchingService` của phần 3. Embedding
+FastEmbed chạy cục bộ và được bật mặc định; lần đầu cần tải model. Có thể tắt khi
+chạy Consumer bằng `python -m streaming.run --no-embedding`. Điểm khớp mặc định
+cần đạt 0.75, đồng thời thỏa điều kiện bằng chứng và độ cách biệt với ứng viên
+khác. Hai bài cùng chủ đề hoặc giống tiêu đề chưa đủ để kết luận cùng vụ.
 
 `article_key` là **mã bài báo**, tính từ nguồn và URL chuẩn hóa như phần 2;
 `event_id` là **mã vụ tai nạn**. Một vụ có thể có nhiều bài với các mã bài khác

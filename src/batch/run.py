@@ -8,6 +8,7 @@ from uuid import uuid4
 import duckdb
 
 from config import EVENT_INPUT_DIR, DATA_GOLD_DIR, EXTRACT_SOURCES
+from events.cli import add_matching_arguments, matching_config
 from events.adapter import json_text, fingerprint
 from events.run import load_silver_articles
 from events.service import MatchingService
@@ -54,7 +55,9 @@ def run_batch(input_paths=None, database_path=DEFAULT_DATABASE, config=None):
         if not incoming:
             raise ValueError("Empty Silver snapshot; refusing to replace canonical data")
         service = MatchingService(config)
-        model = TextModel([a["text"] for a in incoming])
+        model = TextModel([a["text"] for a in incoming],
+                          semantic_model=service.config.semantic_model,
+                          cache_dir=service.config.semantic_cache_dir)
         stats = {"input": len(incoming), "new_event": 0, "matched": 0, "needs_review": 0,
                  "database_path": str(database), "input_manifest": manifest,
                  "input_fingerprint": fingerprint(manifest)}
@@ -102,10 +105,12 @@ def main():
     parser.add_argument("--database", type=Path, default=DEFAULT_DATABASE)
     parser.add_argument("--sources", nargs="+", default=list(EXTRACT_SOURCES),
                         help="Explicit subset of source filenames without .parquet")
+    add_matching_arguments(parser)
     args = parser.parse_args()
     if any(Path(s).name != s or s in (".", "..") for s in args.sources):
         parser.error("sources must be simple filenames")
-    result = run_batch({s: args.input_dir / f"{s}.parquet" for s in args.sources}, args.database)
+    result = run_batch({s: args.input_dir / f"{s}.parquet" for s in args.sources}, args.database,
+                       config=matching_config(args))
     print(json_text(result))
 
 

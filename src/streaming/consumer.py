@@ -1,4 +1,5 @@
 import argparse
+from dataclasses import replace
 import logging
 from pathlib import Path
 import signal
@@ -11,6 +12,7 @@ from .message import parse_message
 from .pipeline import ArticleProcessor
 from .queue import ArticleQueue
 from .repository import ProvisionalRepository
+from events.cli import add_matching_arguments, matching_config
 from config.streaming import database_path, queue_name, redis_client
 
 LOG = logging.getLogger(__name__)
@@ -62,7 +64,9 @@ class Consumer:
 def main():
     parser = argparse.ArgumentParser(description="Run one provisional event writer per queue/database")
     parser.add_argument("--database", type=Path, default=database_path())
+    add_matching_arguments(parser)
     args = parser.parse_args()
+    matching = replace(matching_config(args), radius_hours=24)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     stop = threading.Event()
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -73,7 +77,7 @@ def main():
             repo = ProvisionalRepository(args.database)
             try:
                 repo.initialize()
-                Consumer(ArticleQueue(client, queue_name()), ArticleProcessor(repo), stop).run()
+                Consumer(ArticleQueue(client, queue_name()), ArticleProcessor(repo, matching), stop).run()
             finally:
                 repo.close()
     finally:

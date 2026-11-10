@@ -10,8 +10,9 @@ Từ gốc repository, dùng môi trường đã cài `pip install -e .`:
 
 Lệnh đọc **toàn bộ snapshot lịch sử** trong
 `data/silver/accidents/<source>.parquet` của đủ 7 nguồn, không chỉ các bài mới.
-Đây là Silver đã lọc tai nạn và trích xuất thông tin; batch không crawl,
-không gọi mạng, không làm lại extraction và không sửa Silver.
+Đây là Silver đã lọc tai nạn và trích xuất thông tin; batch không crawl RSS,
+không làm lại extraction và không sửa Silver. FastEmbed có thể tải trọng số model
+ở lần đầu; nội dung được embed cục bộ, không gửi lên API bên ngoài.
 
 Database mặc định: `data/gold/batch/canonical.duckdb`. Chạy thử vào nơi riêng:
 
@@ -34,7 +35,8 @@ article key chỉ tính một lần; bản thiếu key giống hệt nhau giữ 
 ## Cách dựng lại và xuất bản
 
 1. Khóa writer theo đường dẫn database; xác thực và hash đầu vào trước/sau đọc.
-2. Sắp bài ổn định theo thời gian và key; dựng TF-IDF trên toàn bộ tập đầu vào.
+2. Sắp bài ổn định theo thời gian và key; dựng TF-IDF và embedding trên toàn bộ
+   tập đầu vào. Có thể tắt embedding tường minh bằng `--no-embedding`.
 3. Tạo database staging trống, tính lại mọi liên kết bằng logic giai đoạn 3.
 4. Kiểm tra số bài đã gán + số review bằng tổng đầu vào sau dedup, commit,
    checkpoint và đóng database staging.
@@ -97,12 +99,17 @@ Service không ghi database hoặc ack queue. Caller sở hữu transaction, lư
 assignment và aggregation. `events.run`, streaming và batch đều gọi service;
 `decide_match()` vẫn dùng được trực tiếp cho các caller/test cũ.
 
-Batch giữ retrieval cùng tỉnh và khoảng cách **±48 giờ so với thời gian đăng**
-của giai đoạn 3, dù đọc toàn bộ lịch sử. Streaming mặc định chọn khoảng
-**[thời gian đăng bài − 24 giờ, thời gian đăng bài]**, gồm hai biên và loại candidate
-có timestamp tương lai. Dùng timestamp bài để replay không phụ thuộc đồng hồ máy.
-Đây chưa phải thời gian xảy ra tai nạn được trích xuất. Không thay ngưỡng chấm
-điểm hoặc dùng embedding mới trong lần triển khai này.
+Batch giữ retrieval thông thường cùng tỉnh trong **±48 giờ so với thời gian đăng**
+của giai đoạn 3, dù đọc toàn bộ lịch sử. Tin theo dõi xa hơn, tối đa ±168 giờ,
+chỉ được xét khi cùng ngày vụ việc được nêu rõ, cùng địa điểm có tên và không có
+mâu thuẫn. Streaming mặc định xét **24 giờ quá khứ đến timestamp bài**, loại
+candidate tương lai; cũng có thể xét tin theo dõi muộn khi đủ cùng bằng chứng
+ngày/địa điểm. Đây chưa phải thời gian xảy ra tai nạn được trích xuất.
+
+Matching dùng TF-IDF ký tự kết hợp hồ sơ vụ việc và embedding đa ngôn ngữ mặc
+định. Để chỉ dùng hồ sơ + TF-IDF, chạy `python -m batch.run --no-embedding` hoặc
+`python -m streaming.run --no-embedding`. Lần đầu dùng model cần tải trọng số;
+các lần sau dùng cache `data/models/fastembed`.
 
 ## Kiểm thử
 
