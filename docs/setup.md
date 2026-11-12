@@ -1,7 +1,7 @@
 
 # Setup Guide
 
-Hướng dẫn cài đặt môi trường Python, cài dependencies và chạy RSS Crawler.
+Hướng dẫn cài môi trường Python và chạy luồng từ RSS đến database sự kiện.
 
 ## 1. Yêu cầu hệ thống
 
@@ -11,7 +11,7 @@ Hướng dẫn cài đặt môi trường Python, cài dependencies và chạy R
 
 ## 2. Cấu trúc dự án
 
-> [flow.md](../flow.md)
+> [flow.md](flow.md)
 
 ## 3. Tạo môi trường ảo
 
@@ -37,30 +37,8 @@ Sau khi kích hoạt thành công, Terminal thường hiển thị `(.venv)` ở
 
 ## 4. Khai báo dependencies bằng `pyproject.toml`
 
-Tạo file `pyproject.toml` tại thư mục gốc:
-
-```toml
-[project]
-name = "rss-crawler"
-version = "0.1.0"
-description = "RSS crawler for collecting and storing article data"
-requires-python = ">=3.10"
-dependencies = [
-    "requests",
-    "beautifulsoup4",
-    "feedparser",
-    "pandas",
-    "pyarrow",
-    <!-- Them cac thu vien khac vao duoi nay -->
-]
-
-[build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
-```
-
->[!NOTE]
-> Nếu muốn thêm thư viện, thì viết ở chỗ tôi note, rồi chạy lại lệnh install là được
+Repo đã có `pyproject.toml`; dùng file hiện tại, không cần tạo lại.
+Nếu thêm thư viện vào danh sách `dependencies`, chạy lại lệnh cài ở bước 5.
 
 ### Chức năng các thư viện
 
@@ -72,6 +50,10 @@ build-backend = "setuptools.build_meta"
 | pandas | Xử lý dữ liệu dạng bảng |
 | pyarrow | Đọc và ghi dữ liệu Parquet |
 | setuptools | Hỗ trợ cài đặt project |
+| polars | Làm sạch, đọc và ghi dữ liệu |
+| duckdb, pytz | Lưu database và đọc thời gian có múi giờ |
+| scikit-learn | So sánh từ vựng giữa các bài báo |
+| fastembed | Embedding đa ngôn ngữ mặc định cho bước gom sự kiện, chạy trên CPU |
 | ... | ... |
 
 ## 5. Cài đặt dependencies
@@ -82,6 +64,8 @@ python -m pip install -e .
 ```
 
 Lệnh `pip install -e .` cài đặt project ở chế độ editable và tự động cài các dependencies khai báo trong `pyproject.toml`.
+Lệnh này cũng giúp Python tìm được các module trong `src/`; không cần đặt
+`PYTHONPATH` nếu chạy bằng đúng môi trường vừa cài.
 
 ## 6. Update `.env`
 
@@ -100,7 +84,16 @@ Chỉnh sửa các biến, ví dụ biến `DEBUG` để print ra màn hình, gi
 
 Xem cụ thể ở file [`docs/flow.md`](./flow.md) rồi chạy từng luồng phụ (partial flows)
 
->[!NOTE]
-> Do trong các luồng phụ tôi mặc định là folder đã tồn tại, nên ae tạo folder thủ công nhé (nhớ xem folder structure trong `flow.md` trước rồi tạo theo cho đúng)
-> Folders cần tạo thủ công: `data/bronze`, `data/silver`, `data/gold`
-> Sau này khi làm luồng chính (tổng hợp các luồng phụ) tôi mới thêm các hàm tạo folder tự động (`os.makedir()`) sau
+Từ thư mục gốc, sau khi kích hoạt môi trường:
+
+```bash
+python -m main
+python -m events.inspect
+```
+
+`main` tự tạo thư mục dữ liệu. Lệnh đầu lấy RSS và xử lý đến database; lệnh sau
+hiển thị các sự kiện đã lưu. Nếu đã có bài trích xuất trong
+`data/silver/accidents/` và chỉ muốn chạy phần sự kiện,
+dùng `python -m main --step=5`. Bước này mặc định dùng embedding; lần đầu tải model, các lần sau dùng cache. Để chỉ dùng TF-IDF và bằng chứng vụ việc, thêm `--no-embedding`.
+
+Xem [hướng dẫn dễ hiểu và kết quả chạy thật](details/event_database_guide.md).
