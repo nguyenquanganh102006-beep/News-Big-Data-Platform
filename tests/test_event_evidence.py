@@ -35,6 +35,62 @@ def classify(left, right, model_class=TextModel):
 
 
 class EventEvidenceTests(unittest.TestCase):
+    def test_named_bridge_collapse_matches_with_different_vehicle_labels(self):
+        class SimilarReports:
+            def similarity(self, left, right):
+                return 0.55
+
+            def semantic_similarity(self, left, right):
+                return 0.90
+
+        first = report("a", title="Xe cẩu tông sập cầu Đắk Lung, Đồng Nai",
+                       description="Sáng 6/8 tại phường Phước Long, hai người thoát nạn.",
+                       pub_date="2026-08-06T10:00:00+07:00", province="Đồng Nai",
+                       vehicles=["xe công trình"])
+        second = report("b", title="Cầu Đắk Lung sập sau cú tông của xe tải cẩu",
+                        description="Sáng 6/8 tại phường Phước Long, hai người thoát chết.",
+                        pub_date="2026-08-06T14:00:00+07:00", province="Đồng Nai",
+                        vehicles=["xe tải"])
+        a, b = prepare_article(first), prepare_article(second)
+        event = {"event_id": "bridge", "text": a["text"], "members": [a],
+                 "vehicles": a["vehicles"], "anchor_published_at": a["published_at"]}
+        result = decide_match(b, [event], SimilarReports(), MatchConfig())
+        self.assertEqual(result["decision"], "matched")
+        self.assertTrue(result["scores"][0]["evidence"]["corroborated_scene"])
+
+    def test_same_road_and_ward_need_matching_pileup_size(self):
+        class SimilarReports:
+            def similarity(self, left, right):
+                return 0.45
+
+            def semantic_similarity(self, left, right):
+                return 0.90
+
+        first = report("a", title="Tai nạn liên hoàn 7 xe trên cao tốc Phan Thiết ở xã Xuân Quế",
+                       description="Chiều 4/1, giao thông ùn tắc.",
+                       pub_date="2026-01-04T16:00:00+07:00", province="Đồng Nai",
+                       vehicles=[])
+        second = report("b", title="7 ô tô va chạm liên hoàn trên cao tốc Phan Thiết ở xã Xuân Quế",
+                        description="Chiều 4/1, giao thông ùn tắc.",
+                        pub_date="2026-01-04T17:00:00+07:00", province="Đồng Nai",
+                        vehicles=["ô tô"])
+        a, b = prepare_article(first), prepare_article(second)
+        event = {"event_id": "pileup", "text": a["text"], "members": [a],
+                 "vehicles": a["vehicles"], "anchor_published_at": a["published_at"]}
+        self.assertEqual(decide_match(b, [event], SimilarReports(), MatchConfig())["decision"], "matched")
+        different = prepare_article({**second, "title": "8 ô tô va chạm liên hoàn trên cao tốc Phan Thiết ở xã Xuân Quế"})
+        self.assertNotEqual(decide_match(different, [event], SimilarReports(), MatchConfig())["decision"],
+                            "matched")
+
+    def test_unrelated_incident_same_city_and_day_creates_event(self):
+        first = report("a", title="Xe ben cán xe máy trong hầm chui Phan Thúc Duyện",
+                       description="Sáng 31/10, hai người tử vong.")
+        second = report("b", title="Xe buýt va quệt taxi trên đường Nguyễn Thị Thập",
+                        description="Chiều 31/10 tại TP.HCM, giao thông ùn tắc.",
+                        pub_date="2026-10-31T18:00:00+07:00",
+                        vehicles=["xe buýt", "taxi"])
+        self.assertEqual(classify(first, second)["decision"], "new_event")
+
     def test_long_body_chunking_preserves_words_despite_capped_token_count(self):
         text = " ".join(f"word{i}" for i in range(500))
         count = lambda value: min(len(value.split()) + 2, 128)

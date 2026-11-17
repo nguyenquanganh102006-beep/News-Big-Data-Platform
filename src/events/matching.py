@@ -1,26 +1,67 @@
 """Hierarchical event identity decisions with auditable evidence and vetoes."""
 
+import re
+
 from config import MATCH_WEIGHTS, MatchConfig
 from .profile import compare_profiles, token
+
+
+def _bridge_collapse(article):
+    title = token(article.get("title"))
+    return bool(re.search(r"\bcầu\b", title) and re.search(r"\bsập\b|\bgãy\b", title))
+
+
+def _pileup_count(article):
+    title = token(article.get("title"))
+    if "liên hoàn" not in title:
+        return None
+    match = re.search(r"(?<!\d)(\d{1,2})\s+(?:ô\s*tô|xe)\b", title)
+    return int(match.group(1)) if match else None
+
+
+def _corroborated_scene(article, member, evidence, lexical, semantic):
+    """Require a named scene plus a matching incident detail, not just a city/day."""
+    if evidence["conflicts"] or evidence["delta_hours"] > 12:
+        return False
+    if not (evidence["same_incident_date"] or evidence["same_publication_day"]):
+        return False
+    if lexical is None or lexical < 0.35 or (
+            semantic is not None and semantic < 0.82) or (
+            semantic is None and lexical < 0.70):
+        return False
+    places = set(evidence["shared_places"])
+    ward = any(place.startswith("ward:") for place in places)
+    bridge = any(place.startswith("bridge:") and len(place.split(":", 1)[1]) >= 6
+                 for place in places)
+    road = any(place.startswith("road:") and len(place.split(":", 1)[1]) >= 6
+               for place in places)
+    if ward and bridge and _bridge_collapse(article) and _bridge_collapse(member):
+        return True
+    left_count, right_count = _pileup_count(article), _pileup_count(member)
+    return bool(ward and road and left_count is not None and left_count == right_count)
 
 
 def _pair_score(article, member, text_model, config, event_id):
     evidence = compare_profiles(article, member)
     lexical = text_model.similarity(article["text"], member["text"])
     semantic = text_model.semantic_similarity(article["text"], member["text"])
+    scene_match = _corroborated_scene(article, member, evidence, lexical, semantic)
+    evidence["corroborated_scene"] = scene_match
     # Dense similarity is topical evidence, not proof of incident identity.
     text = (0.65 * semantic + 0.35 * lexical if semantic is not None and lexical is not None else lexical)
     location = any(token(article.get(field)) and token(article.get(field)) == token(member.get(field))
                    for field in ("district", "ward")) or bool(evidence["shared_places"])
     left, right = set(article["vehicles"]), set(member["vehicles"])
     vehicles = len(left & right) / len(left | right) if left and right else None
-    values = {"text": text, "location": 1.0 if location else None, "identity": evidence["identity"],
+    values = {"text": text, "location": 1.0 if location else None,
+              "identity": evidence["identity"] if evidence["identity"] is not None else
+              (0.95 if scene_match else None),
               "vehicles": vehicles, "time": 1.0 if evidence["same_incident_date"] else
               max(0.0, 1 - evidence["delta_hours"] / config.radius_hours)}
     coverage = sum(MATCH_WEIGHTS[k] for k, value in values.items() if value is not None)
     score = sum(MATCH_WEIGHTS[k] * value for k, value in values.items() if value is not None) / coverage
     duplicate = lexical is not None and lexical >= 0.85 and (location or bool(vehicles))
-    supported = duplicate or evidence["identity"] is not None
+    supported = duplicate or values["identity"] is not None
     sufficient = text is not None and coverage >= config.min_coverage and supported
     return {"event_id": event_id, "score": score, "coverage": coverage,
             "components": values, "lexical_score": lexical, "semantic_score": semantic,
@@ -38,7 +79,8 @@ def calculate_match_score(article, candidate, text_model, config: MatchConfig) -
     # Do not assemble text, vehicle and location evidence from unrelated members.
     best = dict(max(pairs, key=lambda pair: (pair["sufficient"], pair["score"])))
     best["conflicts"] = sorted({conflict for pair in pairs for conflict in pair["conflicts"]})
-    anchor_related = (anchor_score["near_duplicate"] or anchor_score["evidence"]["identity"] is not None)
+    anchor_related = (anchor_score["near_duplicate"] or
+                      anchor_score["components"]["identity"] is not None)
     best["anchor_compatible"] = anchor_related
     best["sufficient"] = best["sufficient"] and anchor_related
     best["member_scores"] = [{"article_key": pair["matched_member_key"], "score": pair["score"],
@@ -66,7 +108,9 @@ def decide_match(article, candidates, text_model, config: MatchConfig) -> dict:
             and best["score"] >= config.threshold and gap >= config.min_margin):
         return {"decision": "matched", "event_id": best["event_id"], "score": best["score"],
                 "margin": gap, "reasons": ["corroborated_incident_match"], "scores": scores}
-    uncertain = any(not s["sufficient"] or s["score"] >= config.review_threshold for s in viable)
+    uncertain = any(s["score"] >= config.review_threshold or
+                    s["evidence"]["shared_places"] or s["evidence"]["shared_identifiers"]
+                    for s in viable)
     return {"decision": "needs_review" if uncertain else "new_event",
             "reasons": ["ambiguous_or_insufficient_match" if uncertain else "low_similarity"],
             "margin": gap, "scores": scores}
