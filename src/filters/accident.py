@@ -221,7 +221,7 @@ def classify_accident(title: str | None, description: str | None = None,
         return result("not_accident", "human_interest_followup")
     if has(r"đau thương.{0,20}gia đình|tiếng khóc|tang lễ", lead) and not has(r"tông|đâm|va chạm|cán|lật|lao vào", headline):
         return result("uncertain", "bereavement_or_incident_report")
-    if has(r"cứu sống|cứu chữa|phẫu thuật|bệnh viện", headline) and not has(r"tại chỗ|hiện trường|cắt cabin", headline):
+    if has(r"cứu sống|cứu chữa|phẫu thuật|bệnh viện|mổ cấp cứu|ưu tiên mổ", headline) and not has(r"tại chỗ|hiện trường|cắt cabin", headline):
         return result("not_accident", "medical_followup")
     if has(r"bịa đặt|tin giả|sai sự thật|không xảy ra|dựng hiện trường giả", text):
         return result("not_accident", "unverified_or_fake_incident")

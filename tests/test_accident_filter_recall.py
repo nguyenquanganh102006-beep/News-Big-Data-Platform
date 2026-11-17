@@ -107,6 +107,7 @@ class AccidentRecallTests(unittest.TestCase):
             "Xe lu cán công nhân trên công trường đang thi công",
             "Xe tăng húc vào phương tiện của lực lượng gìn giữ hòa bình",
             "Cứu sống bệnh nhân chấn thương nặng sau tai nạn giao thông",
+            "Khánh Hòa: Ưu tiên mổ cấp cứu, nhiều nạn nhân vụ sạt lở đèo qua cơn nguy kịch",
             "Cháy lớn tại bãi giữ ô tô, nhiều xe trơ khung",
             "Gặp xe hỏng, vật cản trên đường có vạch liền: Ô tô được lấn vạch để tránh?",
         ]
