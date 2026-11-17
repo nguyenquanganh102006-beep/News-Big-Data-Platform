@@ -4,11 +4,13 @@ from email.utils import parsedate_to_datetime
 import hashlib
 import html
 import json
+import shutil
 from pathlib import Path
 from uuid import uuid4
 
 from bs4 import BeautifulSoup
 import polars as pl
+import duckdb
 
 from config import DATA_DIR, EXTRACT_SOURCES
 from filters.accident import classify_accident
@@ -49,6 +51,27 @@ def plain(value, paragraph=False):
     return " ".join(soup.get_text(" ", strip=True).split())
 
 
+def snapshot_streaming(root, generation):
+    """Publish a closed, checkpointed provisional DB with the same dashboard generation."""
+    source = root / "gold" / "streaming" / "provisional.duckdb"
+    if not source.is_file():
+        return None
+    with writer_lock(source):
+        with duckdb.connect(str(source)) as connection:
+            counts = {name: connection.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
+                      for name, table in (("articles", "provisional_articles"),
+                                          ("events", "provisional_events"),
+                                          ("event_articles", "provisional_event_articles"),
+                                          ("receipts", "stream_receipts"))}
+            counts["pending_reviews"] = connection.execute(
+                "SELECT count(*) FROM provisional_match_reviews WHERE status='pending'").fetchone()[0]
+            connection.execute("CHECKPOINT")
+        destination = generation / "gold" / "streaming" / "provisional.duckdb"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+    return counts
+
+
 def publish(data_root=DATA_DIR, artifacts_root=None):
     root = Path(data_root).resolve()
     archive = Path(artifacts_root).resolve() if artifacts_root else root.parent / "data_artifacts"
@@ -78,9 +101,10 @@ def publish(data_root=DATA_DIR, artifacts_root=None):
                 key = dedup_make_article_key(source, url)
                 if not key:
                     raise ValueError(f"Missing article URL in {path}")
-                decision = classify_accident(row.get("title"), row.get("description"))
+                decision = classify_accident(row.get("title"), row.get("description"), row.get("content"))
                 rows[key] = dict(article_key=key, source=source, title=plain(row.get("title")),
                                  description=plain(row.get("description"), True), link=url,
+                                 content=row.get("content") or "",
                                  pub_date=parse_date(row.get("pub_date")), accident_label=decision.label,
                                  filter_reason=decision.reason, filter_version=decision.version)
         if not rows:
@@ -120,6 +144,7 @@ def publish(data_root=DATA_DIR, artifacts_root=None):
             path.parent.mkdir(parents=True, exist_ok=True)
             frame.write_parquet(path); paths[source] = path
         stats = run_batch(paths, generation / "gold" / "batch" / "canonical.duckdb")
+        streaming_counts = snapshot_streaming(root, generation)
         duplicate_articles = int(catalog.filter(pl.col("is_duplicate")).height)
         batch_counts = stats["counts"]
         pipeline_counts = {
@@ -142,12 +167,15 @@ def publish(data_root=DATA_DIR, artifacts_root=None):
                 "unassigned_articles": int(batch_counts["unassigned_articles"]),
             },
         }
+        if streaming_counts is not None:
+            pipeline_counts["streaming"] = streaming_counts
         metadata = {"path": str(generation.relative_to(archive)), "articles": catalog.height,
                     "unique_articles": catalog.height - duplicate_articles,
                     "sources": catalog['source'].n_unique(), "date_min": str(catalog['pub_date'].min()),
                     "date_max": str(catalog['pub_date'].max()),
                     "duplicate_articles": duplicate_articles,
                     "pipeline_counts": pipeline_counts,
+                    "streaming": streaming_counts,
                     "batch": stats,
                     "coverage": "Article catalog, accident filtering, extraction, and event matching cover all seven RSS sources."}
         (generation / "manifest.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")

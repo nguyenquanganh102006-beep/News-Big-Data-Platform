@@ -56,12 +56,13 @@ class ArticleProcessor:
             return {"status": "already_processed", "event_id": prior[1]}
         raw = json_text(row)
         cleaned = clean_article(row)
-        label = classify_accident(cleaned["title"], cleaned["description"])
+        label = classify_accident(cleaned["title"], cleaned["description"], cleaned.get("content"))
         article = None
         if label.label == "accident":
             # Keep Bronze metadata in the receipt; extraction needs only scalar fields.
             frame = pl.DataFrame([{k: cleaned[k] for k in (
-                "source", "article_key", "normalized_url", "link", "title", "description", "pub_date")}])
+                "source", "article_key", "normalized_url", "link", "title", "description", "pub_date")}
+                | {"content": cleaned.get("content") or ""}])
             locations = fetch_vnexpress_locations(frame) if row["source"] == "vnexpress" else None
             article = prepare_article(extract_frame(frame, locations).row(0, named=True), reference="redis")
         repo.connection.execute("BEGIN TRANSACTION")

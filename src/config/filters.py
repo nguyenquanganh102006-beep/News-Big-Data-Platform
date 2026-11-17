@@ -9,7 +9,7 @@ DEDUPLICATED_DATA_DIR = os.path.join(DATA_SILVER_DIR, "deduplicated")
 FILTER_SOURCES = tuple(RSS_SOURCES)
 
 
-VERSION = "rules-v3-road"
+VERSION = "rules-v5-full-corpus-review"
 FILTER_LABELS = ("accident", "not_accident", "uncertain")
 DUPLICATE_SIMILARITY_THRESHOLD = 0.85
 DUPLICATE_WINDOW_HOURS = 24

@@ -241,6 +241,16 @@ def main():
                 "Silver gộp bài theo URL. Các bước sau đếm đầu ra thực tế của khử trùng "
                 "nội dung, lọc, trích xuất và batch matching."
             )
+            streaming = counts.get("streaming")
+            if streaming:
+                st.subheader("Kết quả Streaming qua Redis")
+                cols = st.columns(4)
+                for col, label, field in zip(
+                    cols, ["Bài có receipt", "Bài tai nạn đã lưu", "Sự kiện provisional", "Chờ review"],
+                    ["receipts", "articles", "events", "pending_reviews"],
+                ):
+                    col.metric(label, f"{streaming.get(field, 0):,}")
+                st.caption("Chọn gold/streaming trong mục Kho sự kiện ở thanh bên để xem chi tiết kết quả provisional của snapshot này.")
 
     with overview:
         left, right = st.columns([1.3, 1])

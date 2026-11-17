@@ -11,7 +11,7 @@ from config import DEBUG, VERSION, FILTER_LABELS
 def evaluate(samples):
     predictions = []
     for row in samples:
-        decision = classify_accident(row["title"], row.get("description_text", row.get("description")))
+        decision = classify_accident(row["title"], row.get("description_text", row.get("description")), row.get("content"))
         predictions.append({**row, "prediction": asdict(decision)})
     known = [r for r in predictions if r["label"] != "uncertain"]
     tp = sum(r["label"] == "accident" and r["prediction"]["label"] == "accident" for r in known)

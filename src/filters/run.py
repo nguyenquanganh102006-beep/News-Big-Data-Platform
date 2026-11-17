@@ -15,8 +15,9 @@ def filter_frame(df: pl.DataFrame) -> pl.DataFrame:
     if "title" not in df.columns:
         raise ValueError("Silver input must contain a title column")
     descriptions = df["description"].to_list() if "description" in df.columns else [None] * df.height
-    decisions = [classify_accident(title, description)
-                 for title, description in zip(df["title"].to_list(), descriptions)]
+    contents = df["content"].to_list() if "content" in df.columns else [None] * df.height
+    decisions = [classify_accident(title, description, content)
+                 for title, description, content in zip(df["title"].to_list(), descriptions, contents)]
     return df.with_columns([
         pl.Series(column, [getattr(d, field) for d in decisions], dtype=pl.String)
         for column, field in (("accident_label", "label"), ("filter_reason", "reason"),

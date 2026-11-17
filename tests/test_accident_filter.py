@@ -37,7 +37,6 @@ class AccidentFilterTests(unittest.TestCase):
             ("Công nhân tử vong do điện giật khi sửa xe", None),
             ("Thống kê tai nạn: 100 vụ xe máy va chạm trong tháng", None),
             ("Nhiều ôtô bị thiêu rụi trong vụ cháy gara", None),
-            ("Điều tra tai nạn trên quốc lộ", "Xe máy va chạm xe tải, một người bị thương."),
             ("Hải Phòng rà soát sau vụ tai nạn xe máy làm bốn người chết", None),
             ("Khởi tố tài xế gây tai nạn xe máy", None),
             ("Cứu hộ xe khách sau vụ lật xe trên cao tốc", None),
@@ -50,6 +49,10 @@ class AccidentFilterTests(unittest.TestCase):
                 self.assertEqual(classify_accident(title, lead).label, "not_accident")
 
     def test_missing_road_context_is_retained_for_review(self):
+        self.assertEqual(classify_accident(
+            "Điều tra tai nạn trên quốc lộ",
+            "Xe máy va chạm xe tải, một người bị thương."
+        ).label, "uncertain")
         for title in ("Mưa lớn: Cây đổ đè ôtô", "Xe tải bốc cháy"):
             with self.subTest(title=title):
                 self.assertEqual(classify_accident(title).label, "uncertain")

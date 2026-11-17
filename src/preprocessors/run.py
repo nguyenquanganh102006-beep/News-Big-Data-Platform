@@ -7,6 +7,7 @@ from .rss_vnexpress import rss_vnexpress_preprocessor
 from .rss_vietnamplus import rss_vietnamplus_preprocessor
 from .rss_tuoitre import rss_tuoitre_preprocessor
 from .rss_generic import preprocess_rss_source
+from .historical import preprocess_historical_files
 from config import DATA_DIR, DATA_ARTIFACTS_DIR, RSS_SOURCES
 
 
@@ -25,7 +26,7 @@ def bronze_snapshots(crawled_date: str | None = None):
     for base in bases:
         for source in RSS_SOURCES:
             for path in (base / "bronze" / source).glob("*.parquet"):
-                if not re.fullmatch(r"\d{8}_\d{6}(?:_\d{6})?\.parquet", path.name):
+                if not re.fullmatch(r"(?:\d{8}_\d{6}(?:_\d{6})?|history_\d+_\d+)\.parquet", path.name):
                     continue
                 if prefix and not path.stem.startswith(prefix):
                     continue
@@ -48,11 +49,15 @@ def run_preprocessors(crawled_date: str | None = None):
     for source, paths in snapshots.items():
         if not paths:
             raise FileNotFoundError(f"No Bronze snapshot found for {source}")
+        historical = [path for path in paths if path.name.startswith("history_")]
         for path in paths:
+            if path in historical:
+                continue
             if source in specialized:
                 specialized[source](save_file=True, bronze_path=path)
             else:
                 preprocess_rss_source(source, save_file=True, bronze_path=path)
+        preprocess_historical_files(source, historical)
     
 
 

@@ -259,3 +259,34 @@ Hướng dẫn interface, chạy lại và giới hạn: [Batch và matching](de
 Mở `http://127.0.0.1:8501` để xem bộ dữ liệu hiện hành, bài báo, sự kiện canonical/
 provisional và các bài chờ review. Dashboard chỉ đọc; xem
 [hướng dẫn dashboard](details/dashboard.md).
+
+### 10. Chạy lại dữ liệu Bronze lịch sử
+
+Bronze nhập từ crawler lịch sử có tên `history_<id đầu>_<id cuối>.parquet`,
+đặt trong `data/bronze/<source>/` cùng các snapshot RSS cũ. Preprocessor
+nhận cả hai định dạng, chuẩn hóa ngày đăng và giữ `content` của bài lịch sử
+trong Silver để matcher sử dụng. Các file Bronze được giữ nguyên.
+
+Sau khi đưa Bronze vào dự án, chạy toàn bộ các bước trên dữ liệu đã lưu:
+
+```powershell
+.venv/Scripts/python.exe -u scripts/run_historical_pipeline.py
+```
+
+Lệnh chạy tiền xử lý → khử trùng và lọc → trích xuất → Gold Giai đoạn 3
+→ replay qua Redis thật → Batch và publish dashboard. Không crawl lại website.
+Replay đọc các bài Silver không bị đánh dấu trùng, theo thứ tự ngày đăng,
+đưa từng message qua queue riêng `<REDIS_ARTICLE_QUEUE>:history_replay` và
+consumer, ghi vào kho provisional mặc định. Receipt chống xử lý lại cùng bài.
+Các nhãn ngoài nhóm tai nạn được lưu receipt, không tạo event.
+
+Snapshot dashboard chứa cả `gold/batch/canonical.duckdb` và bản chụp
+`gold/streaming/provisional.duckdb` khi kho Streaming tồn tại. Chọn kho ở
+thanh bên để xem kết quả tương ứng; tab Luồng dữ liệu có thêm thống kê
+Streaming. Snapshot được công bố khi hoàn tất thành công.
+
+Tiến độ và kết quả từng bước được ghi vào
+`data_artifacts/historical_pipeline_progress.json`. Nếu phải chạy tiếp từ một
+bước, dùng `--start-at filter`, `extract`, `events`, `streaming` hoặc `publish`.
+Kho canonical mặc định trong `data/gold/batch/` được cập nhật từ kết quả
+snapshot sau khi publish thành công.

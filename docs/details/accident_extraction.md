@@ -1,3 +1,10 @@
+# Cập nhật ngày 17/11/2026
+
+Phiên bản `rules-v3-body-evidence-v1` đã bổ sung đọc trường `content` theo đoạn,
+lưu bằng chứng từ thân bài và kiểm soát bản tin nhiều vụ. Chi tiết thay đổi,
+phép so sánh trên 357 bài và các hạn chế: [báo cáo rà soát](../ra_soat_trich_xuat_357_2026_11_17.md).
+Các mô tả `rules-v2` bên dưới là tài liệu của phiên bản trước.
+
 # Trích xuất thông tin tai nạn — task24
 
 ## Chạy
