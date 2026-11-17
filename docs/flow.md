@@ -12,7 +12,15 @@ Không cần đặt thêm `PYTHONPATH`. Hướng dẫn dễ đọc và kết qu�
 
 Chi tiết: [luồng lọc](details/accident_filter/pipeline.md).
 
+Luồng streaming 4.1–4.2 chạy riêng: bài Bronze → Producer → Redis List →
+làm sạch/lọc/trích xuất → tìm ứng viên/matching → sự kiện tạm trong DuckDB.
+Xem mục 7 bên dưới; `main --step` vẫn dành cho luồng xử lý hiện có.
+
 ## Tiêu chí và đánh giá bộ lọc tai nạn
+
+Phiên bản hiện tại: [rules-v3-road](details/accident_filter/rules_v3.md), áp dụng
+phạm vi đường bộ đã chốt; nhận cháy/vật rơi đè xe trên đường và loại bài chỉ cập
+nhật xử lý sau vụ việc. Trường hợp thiếu bằng chứng vẫn giữ ở hàng review.
 
 Xem [tiêu chí](details/accident_filter/criteria.md) và [cách sinh kết quả đánh giá](details/accident_filter/rules_v1.md). Bộ nhãn trợ lý tự gán và báo cáo điểm số cũ đã được loại bỏ. Đánh giá cần dữ liệu tham chiếu được kiểm duyệt, truyền qua `--samples`; kết quả sinh ra nằm trong `data/evaluation/accident_filter/` và không commit vào Git.
 
@@ -21,10 +29,12 @@ Xem [tiêu chí](details/accident_filter/criteria.md) và [cách sinh kết qu�
 ```text
 News-Big-Data-Platform/
 |-- docs/               # Documentations 
-|-- data/               # Contains output data of the program
+|-- data/               # Bronze, Silver và Gold
+|-- data_artifacts/     # Dashboard snapshots và diagnostics
     |-- bronze/             # Raw data crawled from sources 
     |-- silver/             # Bài đã làm sạch
-        |-- filtered/       # Kết quả lọc theo nguồn
+        |-- deduplicated/  # Task 2.2: cờ bài trùng và manifest
+        |-- filtered/       # Kết quả lọc, chỉ gồm bài gốc
         |-- accidents/      # Bài đã trích xuất, đầu vào phần 3
     |-- gold/               # Database sự kiện và bản xuất từ database
 |-- src/                # Source code of the program
@@ -34,6 +44,7 @@ News-Big-Data-Platform/
     |-- filters/            # Accident filtering
     |-- extractors/         # Accident information extraction
     |-- events/             # Candidate retrieval, matching and DuckDB storage
+    |-- streaming/          # Redis producer, consumer and provisional events
     |-- main.py             # Main flow
 ```
 
@@ -102,7 +113,7 @@ News-Big-Data-Platform/
         |-- run.py                  # Main file to run all the preprocessors
 ```
 
-+ Input: file `.parquet` mới nhất theo tên timestamp trong `data/bronze/<source>/` (output của `crawlers`). Chạy crawler trước nếu chưa có file. Silver được tích lũy sau khi loại trùng trong batch và so với lịch sử.
++ Input: các snapshot `.parquet` trong `data/bronze/<source>/` và snapshot lịch sử trong `data_artifacts/diagnostics/`. Silver được tích lũy sau khi loại trùng trong batch và so với lịch sử.
 
 + Run pipeline
 ```bash
@@ -114,11 +125,15 @@ python -m preprocessors.run
 
 Chi tiết làm sạch: [EDA preprocessors](details/preprocessor_eda.md). Cơ chế chọn file, chuẩn hóa URL và lưu lịch sử: [dedup preprocessors](details/preprocessor_dedup.md).
 
-### 4. Filters
+### 4. Filters và phát hiện bài trùng 2.2
 
-+ Input: Silver tích lũy của VnExpress, VietnamPlus, Tuổi Trẻ.
-+ Hàm: `run_filters()` phân loại bằng `classify_accident()`.
++ Input: Silver tích lũy của cả 7 nguồn RSS.
++ Trước khi phân loại, `run_filters()` gọi `run_content_dedup()`; TF-IDF + cosine so tiêu đề và mô tả trong cửa sổ 24 giờ, ngưỡng mặc định `>= 0.85`.
++ Bài trùng được giữ trong `data/silver/deduplicated/` với `is_duplicate`, `duplicate_of_article_key` và điểm tương đồng. Chỉ bài gốc đi vào phân loại.
++ Hàm phân loại: `classify_accident()`.
 + Output: `classified.parquet`, `accident.parquet`, `not_accident.parquet`, `uncertain.parquet` trong `data/silver/filtered/<source>/`.
+
+Chi tiết: [Task 2.2 — Duplicate Article Detection](details/content_duplicate_detection.md). Ghi chú EDA HTML VietnamPlus cũ ở [preprocessor_eda.md](details/preprocessor_eda.md) được giữ nguyên.
 
 ### 5. Extractors
 
@@ -133,7 +148,7 @@ Chi tiết: [trích xuất thông tin tai nạn](details/accident_extraction.md)
 
 ### 6. Sự kiện tai nạn (3.1, 3.2, 3.3)
 
-Input: `data/silver/accidents/<source>.parquet` của ba nguồn hiện có. Đọc chung
+Input: `data/silver/accidents/<source>.parquet` của cả 7 nguồn RSS. Đọc chung
 các nguồn, sắp bài theo ngày đăng rồi khóa bài. Kho sự kiện được đọc từ DuckDB;
 sự kiện vừa tạo được dùng ngay để so sánh bài tiếp theo.
 
@@ -142,11 +157,13 @@ python -m main --step=5
 python -m events.inspect
 ```
 
-- 3.1 tìm cùng tỉnh trong khoảng ±48 giờ theo ngày đăng.
-- 3.2 lập hồ sơ vụ việc từ văn bản, so TF-IDF và embedding mặc định, đối chiếu
-  địa điểm/ngày xảy ra/đối tượng/phương tiện, kiểm tra mâu thuẫn với cả cụm rồi
-  gộp/tạo mới hoặc giữ bài chờ nếu chưa đủ bằng chứng. Quy trình và tùy chọn tắt
-  embedding: [matching v2](details/event_matching_v2.md).
+- 3.1 tìm ứng viên cùng tỉnh trong bán kính đăng bài ±48 giờ; tin theo dõi đăng
+  muộn có thể được xét xa hơn khi trùng ngày vụ việc và địa điểm cụ thể, không
+  có mâu thuẫn.
+- 3.2 lập hồ sơ vụ việc, so TF-IDF/embedding cùng địa điểm, ngày xảy ra, đối tượng
+  và phương tiện; kiểm tra bằng chứng với từng thành viên của cụm. Bài mơ hồ vào
+  review. Embedding chạy mặc định; có thể tắt rõ ràng bằng `--no-embedding`.
+  Chi tiết: [matching v2](details/event_matching_v2.md).
 - 3.3 lưu vào `data/gold/events/accident_events.duckdb`; xuất Parquet trong
   `data/gold/events/exports/`.
 
@@ -163,3 +180,115 @@ của phần 3. Gold chỉ được ghi bởi bước sự kiện, không chứa
 
 Chi tiết: [bộ lọc ứng viên 3.1](details/event_retrieval.md) và
 [hướng dẫn database](details/event_database_guide.md).
+
+### 7. Streaming (4.1 Redis Queue, 4.2 Streaming Consumer)
+
++ Folder relationship structure:
+
+```text
+News-Big-Data-Platform/
+|-- compose.yaml                 # Redis local, persistent volume and AOF
+|-- src/
+    |-- config/
+        |-- streaming.py         # Redis and streaming database configuration
+    |-- streaming/
+        |-- producer.py          # Enqueue Bronze articles
+        |-- message.py           # Validate JSON and article identity
+        |-- queue.py             # Claim, ACK, recovery and retry
+        |-- pipeline.py          # Reuse cleaning, filtering, extraction and matching
+        |-- repository.py        # Isolated provisional tables
+        |-- consumer.py          # Consumer loop and writer lock
+        |-- run.py               # Streaming entry point
+|-- tests/test_streaming.py
+|-- scripts/smoke_streaming.py    # Replay Bronze into an isolated test database
+|-- docs/details/streaming.md
+```
+
++ Input: một bài theo schema RSS Bronze, kèm `source` thuộc một trong 7 RSS source.
+  Producer gọi `enqueue_article()` sau khi lưu
+  Bronze; hiện chưa tự động thay luồng crawler cũ.
++ Config: `src/config/streaming.py`, biến môi trường trong `.env.example`:
+  `REDIS_URL`, `REDIS_ARTICLE_QUEUE`, `STREAM_DATABASE_PATH`.
++ Run pipeline từ gốc repository, sau khi cài `pip install -e .`:
+
+```powershell
+docker compose up -d --wait redis
+docker compose exec -T redis redis-cli ping
+.venv/Scripts/python.exe -m streaming.run
+```
+
+Terminal khác gửi một file JSON Bronze:
+
+```powershell
+.venv/Scripts/python.exe -m streaming.producer article.json
+```
+
++ Output: mặc định `data/gold/streaming/provisional.duckdb`, gồm
+  `provisional_events`, `provisional_articles`, `provisional_event_articles`,
+  review và receipt chống xử lý lặp. Không sửa bảng sự kiện chính thức phần 3.
++ Chỉ chạy một Consumer cho mỗi cặp queue/database. Ctrl+C dừng an toàn sau
+  bài hiện tại. Message lỗi được retry hoặc giữ trong `<queue>:dead`.
++ `python -m streaming.consumer` vẫn chạy được như lệnh trực tiếp tương đương.
+  Matching dùng chung với batch qua `events.service.MatchingService`; mặc định
+  streaming xét 24 giờ trước timestamp bài, gồm hai biên, loại sự kiện tương lai.
+
+Contract JSON, truy vấn DB, kiểm thử và giới hạn:
+[hướng dẫn streaming](details/streaming.md).
+
+
+### 8. Batch 4.3 và matching dùng chung 4.4
+
+Silver đã trích xuất (`data/silver/accidents/*.parquet`) → dedup → matching giai đoạn 3
+→ dựng lại canonical trong staging → kiểm tra → thay database chính thức.
+
+```powershell
+.venv/Scripts/python.exe -m batch.run
+```
+
+Đầu ra: `data/gold/batch/canonical.duckdb`, gồm `canonical_events`, liên kết bài–vụ,
+review và manifest lần chạy. Không sửa database provisional hoặc dữ liệu Silver.
+Batch đọc toàn bộ lịch sử nhưng giữ retrieval ±48 giờ của giai đoạn 3.
+Hướng dẫn interface, chạy lại và giới hạn: [Batch và matching](details/batch_matching.md).
+
+### 9. Dashboard local
+
+```powershell
+.venv/Scripts/python.exe -m streamlit run src/dashboard/app.py
+```
+
+Mở `http://127.0.0.1:8501` để xem bộ dữ liệu hiện hành, bài báo, sự kiện canonical/
+provisional và các bài chờ review. Dashboard chỉ đọc; xem
+[hướng dẫn dashboard](details/dashboard.md).
+
+### 10. Chạy lại dữ liệu Bronze lịch sử
+
+Bronze nhập từ crawler lịch sử có tên `history_<id đầu>_<id cuối>.parquet`,
+đặt trong `data/bronze/<source>/` cùng các snapshot RSS cũ. Nếu giải nén gói
+`bronze.zip` ngay trong thư mục này, cấu trúc `data/bronze/bronze/<source>/`
+cũng được nhận. Preprocessor
+nhận cả hai định dạng, chuẩn hóa ngày đăng và giữ `content` của bài lịch sử
+trong Silver để matcher sử dụng. Các file Bronze được giữ nguyên.
+
+Sau khi đưa Bronze vào dự án, chạy toàn bộ các bước trên dữ liệu đã lưu:
+
+```powershell
+.venv/Scripts/python.exe -u scripts/run_historical_pipeline.py
+```
+
+Lệnh chạy tiền xử lý → khử trùng và lọc → trích xuất → Gold Giai đoạn 3
+→ replay qua Redis thật → Batch và publish dashboard. Không crawl lại website.
+Replay đọc các bài Silver không bị đánh dấu trùng, theo thứ tự ngày đăng,
+đưa từng message qua queue riêng `<REDIS_ARTICLE_QUEUE>:history_replay` và
+consumer, ghi vào kho provisional mặc định. Receipt chống xử lý lại cùng bài.
+Các nhãn ngoài nhóm tai nạn được lưu receipt, không tạo event.
+
+Snapshot dashboard chứa cả `gold/batch/canonical.duckdb` và bản chụp
+`gold/streaming/provisional.duckdb` khi kho Streaming tồn tại. Chọn kho ở
+thanh bên để xem kết quả tương ứng; tab Luồng dữ liệu có thêm thống kê
+Streaming. Snapshot được công bố khi hoàn tất thành công.
+
+Tiến độ và kết quả từng bước được ghi vào
+`data_artifacts/historical_pipeline_progress.json`. Nếu phải chạy tiếp từ một
+bước, dùng `--start-at filter`, `extract`, `events`, `streaming` hoặc `publish`.
+Kho canonical mặc định trong `data/gold/batch/` được cập nhật từ kết quả
+snapshot sau khi publish thành công.

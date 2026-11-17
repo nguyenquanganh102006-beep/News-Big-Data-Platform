@@ -52,3 +52,5 @@ Thống kê chỉ được in khi `DEBUG=True`:
 `input` là số dòng trước dedup; `batch_duplicates` là số bản dư trong batch; `history_duplicates` là số bản sau batch dedup đã có trong lịch sử; `new` là số bài mới. Luôn có `input = batch_duplicates + history_duplicates + new`. `silver_total` là tổng sau gộp; `status=dry_run` là kết quả dự kiến, chưa ghi file.
 
 Chạy lại cùng batch có khóa hợp lệ cho `new=0`. Các bản khóa null vẫn được giữ và có thể lặp qua các lần chạy. Lịch sử bắt đầu từ Silver hiện có; chưa tự động nạp lại các file Bronze cũ.
+
+Đây là lớp khử trùng theo định danh URL. Phát hiện hai bài ở URL/nguồn khác nhau nhưng có nội dung tương tự được mô tả riêng tại [Task 2.2 — Duplicate Article Detection](content_duplicate_detection.md); hai lớp được dùng bổ sung cho nhau.

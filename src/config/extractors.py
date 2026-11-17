@@ -8,8 +8,8 @@ from .filters import FILTER_SOURCES
 
 EXTRACT_SOURCES = FILTER_SOURCES
 EXTRACT_OUTPUT_DIR = os.path.join(DATA_SILVER_DIR, "accidents")
-EXTRACT_VERSION = "rules-v2"
-VNEXPRESS_EXTRACT_VERSION = "rules-v2+vnexpress-dateline-v1"
+EXTRACT_VERSION = "rules-v3-body-evidence-v1"
+VNEXPRESS_EXTRACT_VERSION = "rules-v3-body-evidence+vnexpress-dateline-v1"
 VNEXPRESS_LOCATION_SELECTOR = "p.description span.location-stamp"
 VNEXPRESS_FETCH_TIMEOUT = (5, 20)
 VNEXPRESS_MAX_HTML_BYTES = 2_000_000
@@ -62,7 +62,7 @@ VEHICLE_PATTERNS = {
     "xe đầu kéo": r"(?:xe )?đầu kéo", "xe container": r"(?:xe )?container",
     "xe ben": r"(?:xe|ô tô|ôtô) ben", "xe tải": r"(?:xe|ô tô|ôtô) tải",
     "xe buýt": r"xe buýt", "xe khách": r"xe khách", "taxi": r"taxi",
-    "ô tô": r"ô tô|ôtô", "tàu hỏa": r"tàu hỏa|tàu hoả|tàu lửa",
+    "ô tô": r"ô tô|ôtô", "tàu hỏa": r"tàu hỏa|tàu hoả|tàu lửa|tàu hàng",
     "xe cứu thương": r"(?:xe|ô tô|ôtô) cứu thương", "xe bồn": r"(?:xe|ô tô|ôtô) bồn",
     "xe ba gác": r"xe ba gác|xe ba bánh", "xe công trình": r"xe múc|xe xúc|xe lu|xe cẩu",
 }
@@ -82,14 +82,14 @@ NUMBER_TOKEN = r"không|một|mốt|hai|ba|bốn|tư|năm|lăm|sáu|bảy|tám|c
 NUMBER_PATTERN = rf"\d+(?:[.,]\d+)*|(?:{NUMBER_TOKEN})(?:\s+(?:{NUMBER_TOKEN}))*"
 NUMBER_WORDS.update({"mốt": 1, "lăm": 5})
 CASUALTY_PATTERNS = {"fatalities": r"tử vong|thiệt mạng|chết|tử nạn", "injuries": r"(?:bị )?thương(?!\s+vong)(?: tích)?|chấn thương"}
-SINGULAR_SUBJECT = r"(?:nam thanh niên|người phụ nữ|người đàn ông|tài xế|lái xe|phụ xe|học viên|thầy dạy lái)"
-CASUALTY_UNIT = rf"người|em|nạn nhân|học sinh|công nhân|hành khách|{SINGULAR_SUBJECT}"
+SINGULAR_SUBJECT = r"(?:nam thanh niên|người phụ nữ|người đàn ông|tài xế|lái xe|phụ xe|học viên|thầy dạy lái|nữ sinh|cô giáo(?: mầm non)?|cháu bé|trẻ nhỏ|cụ ông|cụ bà|cụ già|du khách(?: nước ngoài)?|CSGT)"
+CASUALTY_UNIT = rf"người|em|nạn nhân|học sinh|công nhân|hành khách|thanh thiếu niên|ông cháu|vợ chồng|{SINGULAR_SUBJECT}"
 APPROXIMATE_PATTERN = r"(?:hơn|ít nhất|khoảng|gần|trên|dưới|tới|đến|chừng|[-–]|\d\s+đến)\s*$"
 NON_SCENE_PATTERN = r"(?:quê(?: quán)?|trú|sinh sống|cư trú|bệnh viện|cấp cứu|điều trị|đưa về|đưa đến)[^,;.!?]*$"
 LOCATION_CONTEXT_PATTERN = r"(?:ở|tại|tỉnh|thành phố|tp\.?|địa bàn)\s*$"
 ROAD_PREFIX_PATTERN = r"(?:cao tốc|quốc lộ|đường|đại lộ)\s*$"
 ADMIN_PREFIXES = {"district": r"quận|huyện|thị xã", "ward": r"phường|xã|thị trấn"}
-ADMIN_NAME_PATTERN = r"[^\W\d_]+(?:\s+[^\W\d_]+){0,7}|\d+"
+ADMIN_NAME_PATTERN = r"[^\W\d_]+(?:['’\-][^\W\d_]+)*(?:\s+[^\W\d_]+(?:['’\-][^\W\d_]+)*){0,7}|\d+"
 ROAD_PATTERN = r"(?:cao tốc|quốc lộ|đường|đại lộ)\s+[^,;.!?()]+"
 NEGATION_PATTERN = r"không|chưa|suýt|giả định|nếu|có thể|nguy cơ"
 FACT_NEGATION_PATTERN = r"\b(?:không|chưa|suýt|có thể|nguy cơ)(?:\s+\w+){0,3}\s*$"

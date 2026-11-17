@@ -27,7 +27,8 @@ VÀ |anchor_published_at - published_at| <= radius_hours
 ```
 
 Mặc định `radius_hours=48`: lấy từ 48 giờ trước đến 48 giờ sau, bao gồm hai biên.
-Tổng độ rộng cửa sổ là 96 giờ. Có thể truyền bán kính khác khi cần.
+Đây là cửa sổ rộng 96 giờ (`[-48h, +48h]`), được mở rộng theo yêu cầu người dùng
+ngày 09/11/2026. Có thể truyền bán kính khác.
 
 - Tên tỉnh chuẩn hóa Unicode NFC, khoảng trắng, chữ hoa/thường và alias trong
   `PROVINCE_ALIASES` hiện có. Không tự suy tỉnh từ huyện hoặc đổi địa giới.
@@ -104,7 +105,7 @@ events = pl.DataFrame({
     "anchor_published_at": [
         "2026-10-30T08:00:00+07:00",  # cùng tỉnh, trong cửa sổ
         "2026-10-30T08:00:00+07:00",  # khác tỉnh
-        "2026-10-28T11:59:00+07:00",  # ngoài cửa sổ
+        "2026-10-29T11:59:00+07:00",  # ngoài cửa sổ
     ],
 })
 result = retrieve_candidates(article, events)

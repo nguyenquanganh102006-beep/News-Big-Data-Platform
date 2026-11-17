@@ -3,6 +3,7 @@
 import hashlib
 from importlib.metadata import version
 from pathlib import Path
+from collections import OrderedDict
 import sklearn
 from sklearn.feature_extraction.text import TfidfVectorizer
 from config import DEFAULT_SEMANTIC_MODEL
@@ -12,6 +13,8 @@ from .profile import clean, PROFILE_VERSION
 
 
 _ENCODERS = {}
+_DENSE_CACHE = OrderedDict()
+_DENSE_CACHE_LIMIT = 20000
 
 
 def split_for_encoder(text, token_count, limit=120):
@@ -66,16 +69,31 @@ class TextModel:
             if key not in _ENCODERS:
                 _ENCODERS[key] = TextEmbedding(model_name=semantic_model, cache_dir=path, threads=2)
             encoder = _ENCODERS[key]
-            chunks = {text: split_for_encoder(text, encoder.token_count) for text in corpus}
-            flat = [chunk for text in corpus for chunk in chunks[text]]
-            vectors = iter(encoder.embed(flat, batch_size=16))
+            cache_keys = {text: (semantic_model, path, text) for text in corpus}
+            chunks = {}
             for text in corpus:
+                cached = _DENSE_CACHE.get(cache_keys[text])
+                if cached is not None:
+                    _DENSE_CACHE.move_to_end(cache_keys[text])
+                    self._dense[text] = cached
+                else:
+                    chunks[text] = split_for_encoder(text, encoder.token_count)
+            flat = [chunk for text in corpus if text in chunks for chunk in chunks[text]]
+            vectors = iter(encoder.embed(flat, batch_size=16)) if flat else iter(())
+            for text in corpus:
+                if text not in chunks:
+                    continue
                 rows = [np.asarray(next(vectors), dtype=np.float32) for _ in chunks[text]]
                 weights = [encoder.token_count(chunk) for chunk in chunks[text]]
                 vector = np.average(rows, axis=0, weights=weights).astype(np.float32)
                 if vector.ndim != 1 or not np.isfinite(vector).all() or not np.linalg.norm(vector):
                     raise ValueError("Semantic encoder produced an invalid embedding")
-                self._dense[text] = vector / np.linalg.norm(vector)
+                vector = vector / np.linalg.norm(vector)
+                self._dense[text] = vector
+                _DENSE_CACHE[cache_keys[text]] = vector
+                _DENSE_CACHE.move_to_end(cache_keys[text])
+                while len(_DENSE_CACHE) > _DENSE_CACHE_LIMIT:
+                    _DENSE_CACHE.popitem(last=False)
             metadata.update(fastembed=version("fastembed"), chunking="token-120-weighted-mean-v1",
                             embeddings_sha256=hashlib.sha256(b"".join(
                                 self._dense[text].tobytes() for text in corpus)).hexdigest())

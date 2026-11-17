@@ -45,6 +45,9 @@ class CandidateRetrievalTests(unittest.TestCase):
         events = catalog([("e", "Hà Nội", "2026-10-28T00:00:00+07:00")])
         self.assertEqual(retrieve_candidates(article(), events).candidates.height, 0)
         self.assertEqual(retrieve_candidates(article(), events, radius_hours=72).candidates.height, 1)
+        nearer = catalog([("e", "Hà Nội", "2026-10-29T00:00:00+07:00")])
+        self.assertEqual(retrieve_candidates(article(), nearer, radius_hours=24).candidates.height, 0)
+        self.assertEqual(retrieve_candidates(article(), nearer).candidates.height, 1)
 
     def test_alias_unicode_case_and_whitespace_without_boundary_remapping(self):
         events = catalog([

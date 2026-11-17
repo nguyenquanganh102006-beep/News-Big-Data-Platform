@@ -1,3 +1,10 @@
+# Cập nhật ngày 17/11/2026
+
+Phiên bản `rules-v3-body-evidence-v1` đã bổ sung đọc trường `content` theo đoạn,
+lưu bằng chứng từ thân bài và kiểm soát bản tin nhiều vụ. Chi tiết thay đổi,
+phép so sánh trên 357 bài và các hạn chế: [báo cáo rà soát](../ra_soat_trich_xuat_357_2026_11_17.md).
+Các mô tả `rules-v2` bên dưới là tài liệu của phiên bản trước.
+
 # Trích xuất thông tin tai nạn — task24
 
 ## Chạy
@@ -13,7 +20,7 @@ Không cần API key hoặc dịch vụ LLM.
 
 ## Input và output
 
-Input: `data/silver/filtered/<source>/accident.parquet`, ba nguồn theo `EXTRACT_SOURCES`.
+Input: `data/silver/filtered/<source>/accident.parquet`, cả 7 RSS source trong `EXTRACT_SOURCES`.
 Đọc toàn bộ `title` và `description`, giải mã HTML entity và chuẩn hóa Unicode NFC.
 Riêng VnExpress, bước này mở URL của bài đã được filter chọn và đọc nhãn
 tỉnh/thành nằm đầu bài (`p.description span.location-stamp`). Ví dụ nhãn

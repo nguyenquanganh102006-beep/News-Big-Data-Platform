@@ -94,6 +94,39 @@ python -m events.inspect
 `main` tự tạo thư mục dữ liệu. Lệnh đầu lấy RSS và xử lý đến database; lệnh sau
 hiển thị các sự kiện đã lưu. Nếu đã có bài trích xuất trong
 `data/silver/accidents/` và chỉ muốn chạy phần sự kiện,
-dùng `python -m main --step=5`. Bước này mặc định dùng embedding; lần đầu tải model, các lần sau dùng cache. Để chỉ dùng TF-IDF và bằng chứng vụ việc, thêm `--no-embedding`.
+dùng `python -m main --step=5`. Bước này mặc định dùng embedding; lần đầu tải model, các lần sau dùng cache tại `data/models/fastembed`. Để chỉ dùng TF-IDF và bằng chứng vụ việc, thêm `--no-embedding`.
 
 Xem [hướng dẫn dễ hiểu và kết quả chạy thật](details/event_database_guide.md).
+
+## 8. Redis và Streaming Consumer (4.1–4.2)
+
+Luồng streaming chạy riêng với luồng `main`. Cài Docker Desktop và khởi động
+engine, sau đó chạy tại gốc repository:
+
+```powershell
+docker compose up -d --wait redis
+docker compose exec -T redis redis-cli ping
+.venv/Scripts/python.exe -m streaming.run
+```
+
+`PONG` xác nhận Redis sẵn sàng. Biến môi trường Redis và database streaming
+được mô tả trong `.env.example`, đọc bởi `src/config/streaming.py`.
+Xem [luồng tổng thể](flow.md) và [hướng dẫn streaming](details/streaming.md)
+để gửi bài bằng Producer, kiểm tra dữ liệu và chạy test.
+
+
+## Batch 4.3 và matching 4.4
+
+Sau khi đã có Silver accidents của cả 7 nguồn RSS:
+
+Preprocessor đọc toàn bộ snapshot Bronze duy nhất trong `data/bronze/`,
+`data/bronze/bronze/` và các
+snapshot crawl đã lưu ở `data_artifacts/diagnostics/`; bản sao cùng nguồn và tên
+snapshot chỉ được xử lý một lần.
+
+```powershell
+.venv/Scripts/python.exe -m batch.run
+```
+
+Batch không cần Redis; database mặc định là `data/gold/batch/canonical.duckdb`.
+Xem [hướng dẫn batch](details/batch_matching.md) để chọn nguồn, đường dẫn và kiểm thử.
