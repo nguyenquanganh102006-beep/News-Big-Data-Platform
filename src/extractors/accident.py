@@ -255,7 +255,7 @@ def supplement_body(result: AccidentExtraction, content: str) -> None:
         location = field in ("province", "district", "ward")
         eligible = [(p, raw) for p, raw in zip(parts, paragraphs)
                     if not location or re.search(
-                        r"xảy ra|đoạn (?:qua|thuộc)|địa phận|khu vực trên thuộc|khi đến|hiện trường", raw, re.I)]
+                        r"xảy ra|đoạn (?:qua|thuộc)|qua địa bàn|địa phận|khu vực trên thuộc|khi đến|hiện trường", raw, re.I)]
         candidates = {getattr(p, field) for p, raw in eligible if getattr(p, field) is not None
                       and (location or getattr(p, field) != 0 or re.search(
                           r"không (?:có|ghi nhận) thương vong|không (?:có )?(?:ai|người nào)\b", raw, re.I))}

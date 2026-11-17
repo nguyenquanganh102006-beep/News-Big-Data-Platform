@@ -66,3 +66,23 @@ PYTHONPATH=src .venv/bin/python -m events.run --database data/evaluation/phase3_
 ```
 
 Đầu ra lọc nằm tại `data/silver/filtered/<source>/classified.parquet` và các file theo nhãn. Thống kê khử trùng nằm ở `data/silver/deduplicated/manifest.json`.
+
+## Cập nhật: lấy thân bài sau khi lọc đầu RSS
+
+RSS hiện chỉ cung cấp các trường đang chọn như tiêu đề, mô tả ngắn và liên kết. Đã thêm lượt lọc đầu bằng dữ liệu đó. Với bài được nhận là tai nạn hoặc còn chưa chắc chắn mà thiếu `content`, chương trình mở URL của đúng nguồn báo, lấy thân bài, lưu kết quả vào cache rồi lọc lại trước khi trích xuất và ghép vụ. Bài đã có thân bài không bị tải lại. Nếu URL lỗi hoặc trang không có vùng thân bài rõ ràng, chương trình giữ bài và ghi `body_fetch_status`; nó không dùng nội dung của khung “bài liên quan” làm thân bài.
+
+Đã thử trực tiếp trên cả 7 nguồn. Trong **338 bài tai nạn** sau lượt lọc mới, 202 bài đã có thân bài, 61 bài được lấy thêm thân bài từ URL và 75 bài vẫn thiếu. Nhóm còn thiếu gồm 52 trang Báo Xây dựng, 22 trang Tiền Phong và 1 trang Dân Trí; nhiều trang trong đó là bản tin video hoặc clip, chỉ có mô tả ngắn. Kết quả lấy bài được lưu trong `data/silver/filtered/<source>/body_cache.parquet`; trang không có thân bài được thử lại sau một ngày.
+
+Đã sửa thêm lỗi trích xuất tỉnh: nơi cư trú của tài xế và tỉnh ở cuối hướng di chuyển không được dùng làm nơi xảy ra vụ việc. Ví dụ bài xe khách ở Đồng Tháp trước đây bị để trống tỉnh vì có nhắc tài xế ngụ An Giang. Khi có thân bài mới và quy tắc này, số bài thiếu tỉnh trong đầu vào Phần 3 giảm từ 119 xuống 111. Bộ lọc cũng nhận thêm một bài tai nạn ở Gia Lai nhờ thân bài; bài về cây đổ đè ô tô khi mưa lớn vẫn ở nhóm chưa chắc chắn vì không rõ xe có đang lưu thông hay không. Phiên bản bộ lọc là `rules-v5.3-body-enrichment`.
+
+| Kết quả Phần 3 | Trước cập nhật | Sau cập nhật |
+|---|---:|---:|
+| Bài tai nạn đầu vào | 337 | 338 |
+| Sự kiện mới | 173 | 182 |
+| Bài ghép vào sự kiện | 13 | 18 |
+| Bài đã liên kết với sự kiện | 186 | 200 |
+| Bài chờ xem xét | 151 | 138 |
+
+Trong 138 bài chờ mới, 111 bài thiếu tỉnh, 34 bài có dấu hiệu kể nhiều vụ, 30 bài thiếu chi tiết diễn biến và 5 bài có ứng viên nhưng chưa đủ căn cứ ghép. Các lý do có thể chồng nhau. Số bài chờ giảm cho thấy dữ liệu đầy đủ hơn giúp hệ thống đưa ra thêm quyết định; chưa có nhãn độc lập để kết luận độ đúng của toàn bộ các quyết định ghép. Các nhóm ghép có nhiều bài đã được xem theo tiêu đề, không thấy cặp khác vụ rõ ràng trong lượt kiểm tra này.
+
+Database thử nghiệm mới nằm tại `data/evaluation/phase3_body_enriched_338_20261117/events.duckdb`; Parquet xuất nằm trong `exports/` cùng thư mục. Đã chạy lại toàn bộ bước lọc, trích xuất và ghép vụ. Bộ kiểm thử chạy 197 trường hợp: **192 đạt, 5 bỏ qua**. Lần chạy này cần truy cập các trang báo để lấy nội dung; dữ liệu tải về và database thử nghiệm nằm trong `data/`, không được đưa lên GitHub.

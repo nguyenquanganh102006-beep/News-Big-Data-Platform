@@ -43,6 +43,31 @@ class BodyExtractionTests(unittest.TestCase):
         self.assertEqual(r.province, "Hà Nội")
         self.assertEqual(r.vehicles, ["xe máy"])
 
+    def test_driver_residence_does_not_override_crash_province(self):
+        r = extract_accident(
+            "Đồng Tháp: Xe khách lao vào lề đường",
+            content="Tại tỉnh Đồng Tháp, xe khách va chạm với ba người bên đường. "
+                    "Tài xế ngụ tỉnh An Giang đang điều khiển xe.")
+        self.assertEqual(r.province, "Đồng Tháp")
+
+    def test_route_destination_does_not_override_crash_province(self):
+        r = extract_accident(
+            "Lâm Đồng: Xe bán tải va chạm xe đầu kéo",
+            content="Vụ tai nạn xảy ra đoạn qua xã Quảng Tín, tỉnh Lâm Đồng. "
+                    "Xe bán tải chạy theo hướng từ Lâm Đồng đi TP Đồng Nai.")
+        self.assertEqual(r.province, "Lâm Đồng")
+
+    def test_residence_word_does_not_match_inside_other_words(self):
+        r = extract_accident("Xe máy bốc cháy ngùn ngụt trên cầu ở TPHCM")
+        self.assertEqual(r.province, "TP Hồ Chí Minh")
+
+    def test_vehicle_crossing_local_area_sets_scene_province(self):
+        r = extract_accident(
+            "Xe khách bốc cháy trơ khung",
+            content="Xe khách lưu thông qua địa bàn xã Hòa Xuân (tỉnh Đắk Lắk) thì bốc cháy.\n"
+                    "Tài xế ngụ tại tỉnh Thanh Hóa đã đưa hành khách thoát ra ngoài.")
+        self.assertEqual(r.province, "Đắk Lắk")
+
     def test_body_subgroup_zero_not_article_zero(self):
         r = extract_accident("Xe khách va chạm", content="Tài xế không bị thương.")
         self.assertIsNone(r.injuries)

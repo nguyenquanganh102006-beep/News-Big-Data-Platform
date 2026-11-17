@@ -276,6 +276,12 @@ def classify_accident(title: str | None, description: str | None = None,
         return result("not_accident", "advice_or_hypothetical")
     if has(r"sau (?:vụ|sự cố).*?(?:dự kiến|xây|sửa)|dự kiến.*sau sự cố", headline):
         return result("not_accident", "followup_excluded")
+    if (has(r"mưa lớn|gió giật|bão|dông", headline)
+            and has(r"cây.{0,30}(?:đổ|gãy).{0,25}(?:đè|trúng).{0,20}(?:ô tô|ôtô|xe)", headline)
+            and not has(r"(?:xe|ô tô|ôtô).{0,25}(?:đang lưu thông|đang chạy|đang di chuyển)|"
+                        r"(?:tài xế|người lái).{0,35}(?:bị thương|tử vong)",
+                        text + " " + body_opening[:700])):
+        return result("uncertain", "weather_damage_vehicle_movement_unknown")
     if (has(r"suýt|né tai nạn|né tránh trong gang tấc", text)
             and not has(IMPACT, actual_text(text))
             and not primary_report("", body_opening)):

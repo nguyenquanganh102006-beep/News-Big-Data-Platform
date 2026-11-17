@@ -130,6 +130,13 @@ class AccidentRecallTests(unittest.TestCase):
         metrics, _ = evaluate([{"sample_id": "body", "label": "accident", **frame.row(0, named=True)}])
         self.assertEqual(metrics["recall_accident"], 1)
 
+    def test_weather_damage_needs_moving_vehicle_evidence(self):
+        title = "Mưa lớn, gió giật mạnh làm cây đổ đè trúng ô tô"
+        body = "Nhiều cây đổ trên đường, có cây đè phương tiện của người dân."
+        self.assertEqual(classify_accident(title, content=body).label, "uncertain")
+        moving = "Ô tô đang lưu thông trên đường thì bị cây đổ đè trúng, tài xế bị thương."
+        self.assertEqual(classify_accident(title, content=moving).label, "accident")
+
 
 if __name__ == "__main__":
     unittest.main()
