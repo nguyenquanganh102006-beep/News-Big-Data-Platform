@@ -123,3 +123,37 @@ Kiểm tra quyết định ghép cho thấy ba cặp thực sự cùng vụ như
 Chạy lại **toàn bộ 265 bài** trên database mới cho kết quả: **166 sự kiện mới, 21 bài ghép vào sự kiện có sẵn, 187 bài đã liên kết, 78 bài còn chờ**. Đối chiếu từng bài với lần chạy trước cho thấy **chỉ đúng bốn bài đổi quyết định**: ba bài được ghép vào đúng sự kiện đã có (7 ô tô trên cao tốc Phan Thiết – Dầu Giây, cầu Đắk Lung, cầu Tân Thành); một bài va quệt taxi trở thành sự kiện mới. Không có bài khác đổi kết quả. Trong 78 bài còn chờ, lý do chính gồm 65 bài thiếu tỉnh/thành, 12 bài thiếu chi tiết vụ việc và 1 bài kể nhiều vụ.
 
 Database mới: `data/evaluation/phase3_matcher_v3_265_20261117/events.duckdb`; file xuất nằm tại `exports/` bên cạnh. Bộ kiểm thử chạy 202 trường hợp: **197 đạt, 5 bỏ qua**. Chưa có bộ nhãn độc lập cho toàn bộ cặp bài, nên kết quả trên xác nhận bốn trường hợp đã kiểm tra và không chứng minh chất lượng ghép trên mọi tình huống tương lai.
+
+## Kiểm tra 65 bài thiếu tỉnh/thành và 12 bài thiếu chi tiết tai nạn
+
+### Nguyên nhân
+
+Trong 65 bài bị chờ vì thiếu tỉnh/thành, nhiều bài thực ra có địa điểm hiện trường trong thân bài. Bộ trích xuất cũ bỏ sót tỉnh nằm trong ngoặc sau xã/phường, dạng viết tắt `TP. Huế`, hoặc dòng địa điểm mở đầu bài VnExpress. Chẳng hạn, [vụ xe con lật ở Ninh Bình](https://thanhnien.vn/tong-vao-xe-dau-keo-xe-con-phoi-bung-tren-cao-toc-185260311101433682.htm) ghi `P. Đồng Văn (Ninh Bình)`; [xe tải sụp hố ở Hà Nội](https://tuoitre.vn/xe-tai-sup-ho-tren-duong-nguyen-trai-doan-vua-hoan-tra-mat-bang-chong-ngap-20260423174343843.htm) ghi `đường Nguyễn Trãi (Hà Nội)`; [vụ trên cầu Nhật Tân](https://vnexpress.net/xe-ben-gay-tai-nan-lien-hoan-tren-cau-nhat-tan-5139454.html) bắt đầu thân bài bằng `Hà Nội` dù lần lấy dấu địa điểm riêng của VnExpress báo lỗi.
+
+Một số bài nhắc nhiều tỉnh nhưng không nói rõ tỉnh nào là hiện trường. Tỉnh có thể là quê tài xế, nơi cấp biển số, nơi đặt cơ quan công an, tên tuyến đường hoặc điểm đầu/cuối hành trình. Chọn một tỉnh từ các thông tin này có thể làm ghép nhầm vụ. Bản tin kể nhiều tai nạn cũng không có một tỉnh chung. Bài ở nước ngoài không thể điền vào trường tỉnh/thành Việt Nam.
+
+Trong 12 bài bị chờ chủ yếu vì thiếu chi tiết tai nạn, bộ từ khóa cũ chưa nhận ra các cách viết như `va quẹt`, `tạt đầu ... ngã`, xe sụt hố, cây đè xe, lũ cuốn xe, sét đánh người đang đi xe và xe bị vùi lấp. Một bài chỉ kể việc giải cứu **sau** tai nạn; một bản tin `Toàn cảnh` gồm nhiều chủ đề, không phải một vụ duy nhất.
+
+### Thay đổi đã làm
+
+- Nhận tỉnh/thành theo đoạn mô tả hiện trường trong tiêu đề, mô tả và thân bài; nhận tỉnh trong ngoặc sau xã/phường, `TP. Huế` và dòng địa điểm đầu bài. Khi một đoạn chỉ nói về tuyến đường, biển số, nơi ở hoặc cơ quan công an, không lấy tỉnh ở đó làm hiện trường. Bài có nhiều vụ giữ trạng thái chờ.
+- Bổ sung các dạng diễn biến tai nạn nêu trên, gồm cả `đâm dồn toa`. Loại tin chỉ giải cứu sau vụ việc và tin mái tôn rơi nhưng nội dung xác nhận không gây tai nạn.
+- Thêm kiểm thử cho các trường hợp nhận đúng và các trường hợp dễ ghép sai: tỉnh trong ngoặc, dòng địa điểm, tên tuyến đường, hành trình tàu, biển số, cơ quan công an, bản tin nhiều vụ và tin cận tai nạn.
+
+### Kết quả chạy lại toàn bộ phần 3
+
+| Chỉ số | Trước sửa | Sau sửa |
+|---|---:|---:|
+| Bài tai nạn có nội dung đưa vào ghép vụ | 265 | 263 |
+| Bài đã gắn với sự kiện | 187 | 219 |
+| Sự kiện mới | 166 | 192 |
+| Bài ghép vào sự kiện có sẵn | 21 | 27 |
+| Bài còn chờ | 78 | 44 |
+| Chờ vì thiếu tỉnh/thành | 65 | 42 |
+| Chờ chủ yếu vì thiếu chi tiết tai nạn | 12 | 0 |
+
+Trong **65 bài thiếu tỉnh/thành ban đầu**, 22 bài nay đã gắn với sự kiện, 1 tin mái tôn được loại vì không có tai nạn, 42 bài vẫn chờ. Trong **12 bài thiếu chi tiết ban đầu**, 10 bài nay đã gắn với sự kiện, 1 tin chỉ nói việc giải cứu được loại, 1 bản tin nhiều chủ đề vẫn chờ. Tổng cộng 32 bài cũ chuyển từ chờ sang gắn sự kiện và 2 bài không thuộc tập tai nạn được loại. Không có bài mới nào chuyển từ đã gắn sự kiện sang chờ.
+
+Trong **42 bài còn thiếu tỉnh/thành**, có 20 bản tin nhiều vụ/chủ đề, 13 bài về sự việc ở nước ngoài và 9 bài còn lại thiếu địa điểm hiện trường đủ chắc hoặc thiếu thân bài. Ví dụ [ô tô cháy trên cao tốc Hà Nội – Hải Phòng](https://tienphong.vn/o-to-boc-chay-tren-cao-toc-ha-noi-hai-phong-post1805765.tpo) chỉ nêu tên tuyến đường và km; [xe Lynk & Co lật trên cao tốc](https://tuoitre.vn/can-canh-chiec-lynk-co-06-lat-6-vong-tren-cao-toc-nhung-gia-dinh-viet-van-bao-toan-tinh-mang-20260314083759041.htm) chỉ nêu hành trình từ Đắk Lắk vào TP.HCM; [tai nạn của Anthony Joshua](https://tuoitre.vn/anthony-joshua-thoat-chet-sau-vu-tai-nan-nghiem-trong-o-nigeria-20251230062729713.htm) xảy ra ở Nigeria. Hai bài khác có ứng viên ghép nhưng chứng cứ vẫn chưa đủ chắc, nên tiếp tục chờ. Cờ `missing_incident_details` còn xuất hiện ở **một bản tin nhiều chủ đề**, nhưng không còn là lý do chính của bài tai nạn đơn lẻ nào.
+
+Đã chạy lại bộ lọc trên 20.953 bài Silver sau khử trùng, trích xuất và ghép toàn bộ **263 bài** vào database mới `data/evaluation/phase3_scene_location_verified_20261117/events.duckdb`; Parquet kết quả ở `exports/` bên cạnh. Bộ kiểm thử đầy đủ chạy **211 trường hợp: 206 đạt, 5 bỏ qua**. Database và Parquet nằm trong `data/`, không đưa lên GitHub. Vẫn chưa có bộ nhãn độc lập cho toàn bộ các cặp bài, nên các quyết định ghép ngoài những trường hợp đã kiểm tra cần được đánh giá thêm nếu dùng làm số liệu chính thức.

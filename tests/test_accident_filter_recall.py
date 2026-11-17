@@ -8,6 +8,18 @@ import polars as pl
 
 
 class AccidentRecallTests(unittest.TestCase):
+    def test_rescue_only_followup_is_excluded(self):
+        decision = classify_accident("Giải cứu tài xế sau vụ tai nạn ở TP.HCM",
+                                     "Lực lượng cứu hộ đưa tài xế ra khỏi cabin.")
+        self.assertEqual(decision.label, "not_accident")
+
+    def test_fallen_roof_without_accident_is_excluded(self):
+        decision = classify_accident(
+            "Gió giật phăng mái tôn, xe tải đỡ giúp người đi đường",
+            "Mái tôn rơi xuống đường cạnh xe tải.",
+            "Gió giật bay mái tôn xuống đường, rất may không gây tai nạn cho người đi đường.")
+        self.assertEqual(decision.label, "not_accident")
+
     def test_full_audit_scope_boundaries(self):
         cases = [
             ("Clip: Đất sạt xuống quốc lộ", "Xe máy người đi đường bị vùi lấp.", None, "accident"),

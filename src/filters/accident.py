@@ -153,6 +153,13 @@ def classify_accident(title: str | None, description: str | None = None,
         return result("uncertain", "missing_title")
     roundup = has(ROUNDUP, headline)
     body_opening = normalize(content)[:2200]
+    if (has(r"giải cứu", headline) and has(r"sau (?:vụ )?tai nạn", headline)
+            and not has(IMPACT, headline) and not has(IMPACT, body_opening)):
+        return result("not_accident", "followup_excluded")
+    if (has(r"không gây tai nạn|không xảy ra tai nạn", body_opening[:700])
+            and has(r"mái tôn|cây|vật rơi", headline)
+            and not has(r"bị thương|tử vong|hư hỏng|va chạm|tông|đâm", body_opening[:700])):
+        return result("not_accident", "object_near_miss")
     # A bulletin's discrete news item is primary reporting, unlike an old crash
     # cited as background in a policy or advice article.
     if re.search(r"^(?:bản tin|chuyển động|xem nhanh|toàn cảnh)", body_opening):

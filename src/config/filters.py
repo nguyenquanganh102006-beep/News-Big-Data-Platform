@@ -9,7 +9,7 @@ DEDUPLICATED_DATA_DIR = os.path.join(DATA_SILVER_DIR, "deduplicated")
 FILTER_SOURCES = tuple(RSS_SOURCES)
 
 
-VERSION = "rules-v5.4-skip-empty-video"
+VERSION = "rules-v5.6-exclude-incident-followups-and-near-misses"
 FILTER_LABELS = ("accident", "not_accident", "uncertain", "skipped_video")
 DUPLICATE_SIMILARITY_THRESHOLD = 0.85
 DUPLICATE_WINDOW_HOURS = 24
