@@ -19,7 +19,9 @@ from config import (
     FACT_NEGATION_PATTERN, HYPOTHETICAL_PATTERN, UPDATE_PATTERN, MULTI_EVENT_PATTERN, CasualtyMention,
     SCENE_PATTERN, SUBJECT_ALIASES, DISJOINT_GROUP_PATTERN, VICTIM_AGE_PATTERN,
     NEAR_MISS_PATTERN, DISJOINT_ROLE_PAIRS,
+    ArticleLocation, ARTICLE_LOCATION_SCHEMA, VNEXPRESS_EXTRACT_VERSION,
 )
+from .vnexpress import fetch_vnexpress_locations
 
 
 def clean_text(value: str | None) -> str:
@@ -127,7 +129,8 @@ def is_negated(text: str, start: int, end: int) -> bool:
 
 def casualty_mentions(text: str, outcome: str) -> list[CasualtyMention]:
     mentions = []
-    pattern = rf"\b(?P<number>{NUMBER_PATTERN})\s+(?:(?P<subject>{CASUALTY_UNIT})\s+)?(?:khác\s+)?(?:{VICTIM_AGE_PATTERN})?(?:(?:đã|bị|đều|cũng|được xác định)\s+)*(?:{outcome})\b"
+    travel = r"(?:(?:đi|điều khiển) xe (?:mô tô|máy|đạp điện|đạp)|đi bộ|trên xe)\s+"
+    pattern = rf"\b(?P<number>{NUMBER_PATTERN})\s+(?:(?P<subject>{CASUALTY_UNIT})\s+)?(?:khác\s+)?(?:{VICTIM_AGE_PATTERN})?(?:{travel})?(?:(?:đã|bị|đều|cũng|được xác định)\s+)*(?:{outcome})\b"
     for match in re.finditer(pattern, text, flags=re.I):
         before = clause_prefix(text, match.start())
         if re.search(APPROXIMATE_PATTERN, before, flags=re.I) or is_negated(text, match.start(), match.end()):
@@ -163,6 +166,16 @@ def casualty_mentions(text: str, outcome: str) -> list[CasualtyMention]:
         mentions.append(CasualtyMention(0, match.group(), match.start(), match.end()))
     for match in re.finditer(r"không (?:có|ghi nhận) thương vong", text, flags=re.I):
         mentions.append(CasualtyMention(0, match.group(), match.start(), match.end()))
+    # Explicit singular noun phrases missed by the original role vocabulary.
+    singular = rf"(?:một\s+)?(?:{SINGULAR_SUBJECT}|cô gái|bé gái|bé trai|người lái xe|nữ tài xế|nam tài xế|phụ nữ)"
+    bridge = rf"(?:\s+(?:{VICTIM_AGE_PATTERN}))?(?:\s*(?:{travel}))?(?:\s+(?:bị (?:ô tô|xe tải|xe máy|xe đầu kéo|xe buýt|xe khách) (?:tông|cán|đâm)(?: trúng)?|chạy ngang qua đường cao tốc))?"
+    for match in re.finditer(rf"\b{singular}{bridge}\s+(?:đã\s+|bị\s+)?(?:{outcome})\b", text, re.I):
+        if any(match.start() < m.end and match.end() > m.start for m in mentions):
+            continue
+        before = clause_prefix(text, match.start())
+        if re.search(rf"(?:{NUMBER_PATTERN}|các|những|nhiều|cả)\s*$", before, re.I) or is_negated(text, match.start(), match.end()):
+            continue
+        mentions.append(CasualtyMention(1, match.group(), match.start(), match.end(), subject="singular_person"))
     return mentions
 
 
@@ -213,7 +226,78 @@ def extract_casualties(headline: str, lead: str, result: AccidentExtraction) -> 
             result.evidence[field] = list(dict.fromkeys(m.evidence for m in head + body))
 
 
-def extract_accident(title: str | None, description: str | None = None) -> AccidentExtraction:
+def article_paragraphs(content: str | None) -> list[str]:
+    """Keep paragraph boundaries and discard explicit related-story trailers."""
+    if content is not None and not isinstance(content, str):
+        raise ValueError("content must be a string or null")
+    soup = BeautifulSoup(html.unescape(content or ""), "html.parser")
+    for tag in soup.find_all(["script", "style", "aside", "nav"]):
+        tag.decompose()
+    paragraphs = []
+    for raw in soup.get_text("\n", strip=True).splitlines():
+        paragraph = clean_text(raw)
+        if re.match(r"^(?:TTO\s*[-–]|Đọc thêm\b|Xem thêm\b|Tin liên quan\b|Bài liên quan\b)", paragraph, re.I):
+            break
+        if paragraph and paragraph not in paragraphs:
+            paragraphs.append(paragraph)
+    return paragraphs
+
+
+def supplement_body(result: AccidentExtraction, content: str) -> None:
+    paragraphs = article_paragraphs(content)
+    # Related-story text without an explicit marker cannot safely be assigned to
+    # the current event. Conflicts remain null rather than selecting a maximum.
+    parts = [extract_accident(p) for p in paragraphs]
+    multi = any("multiple_events_in_article" in p.review_reasons for p in parts)
+    if multi:
+        result.review_reasons.append("multiple_events_in_article")
+    for field in ("province", "district", "ward", "fatalities", "injuries"):
+        location = field in ("province", "district", "ward")
+        eligible = [(p, raw) for p, raw in zip(parts, paragraphs)
+                    if not location or re.search(
+                        r"xảy ra|đoạn (?:qua|thuộc)|địa phận|khu vực trên thuộc|khi đến|hiện trường", raw, re.I)]
+        candidates = {getattr(p, field) for p, raw in eligible if getattr(p, field) is not None
+                      and (location or getattr(p, field) != 0 or re.search(
+                          r"không (?:có|ghi nhận) thương vong|không (?:có )?(?:ai|người nào)\b", raw, re.I))}
+        existing = getattr(result, field)
+        if existing is not None:
+            candidates.add(existing)
+        blocked = any(f"conflicting_{field}" in p.review_reasons or
+                      f"ambiguous_{field}" in p.review_reasons for p in [result] + [p for p, _ in eligible])
+        if len(candidates) > 1 or blocked:
+            setattr(result, field, None)
+            result.review_reasons.append(f"conflicting_{field}")
+        elif candidates:
+            setattr(result, field, next(iter(candidates)))
+        for p, raw in eligible:
+            if field in p.evidence:
+                result.evidence.setdefault(field, []).extend(p.evidence[field])
+                result.evidence.setdefault(f"{field}_body_context", []).append(raw)
+    # Do not interpret traffic diversions, police vehicles or treatment as
+    # vehicles involved in the crash. Only add body facts in incident clauses.
+    for p, raw in zip(parts, paragraphs):
+        if re.search(r"điều tiết|phân luồng|chốt chặn|cứu hộ|cứu nạn", raw, re.I):
+            continue
+        if not p.incident_types and not re.search(r"liên quan đến các phương tiện gồm", raw, re.I):
+            continue
+        for field in ("vehicles", "incident_types"):
+            setattr(result, field, list(dict.fromkeys(getattr(result, field) + getattr(p, field))))
+            result.evidence.setdefault(field, []).extend(p.evidence.get(field, []))
+    if "multiple_events_in_article" in result.review_reasons:
+        result.fatalities = result.injuries = None
+    for field in ("province", "district", "fatalities", "injuries", "vehicles"):
+        if getattr(result, field) is not None and getattr(result, field) != []:
+            result.review_reasons = [r for r in result.review_reasons if r != f"missing_{field}"]
+        elif f"missing_{field}" not in result.review_reasons:
+            result.review_reasons.append(f"missing_{field}")
+    if result.incident_types:
+        result.review_reasons = [r for r in result.review_reasons if r != "missing_incident_details"]
+    result.review_reasons = list(dict.fromkeys(result.review_reasons))
+    result.evidence = {k: list(dict.fromkeys(v)) for k, v in result.evidence.items()}
+
+
+def extract_accident(title: str | None, description: str | None = None,
+                     content: str | None = None) -> AccidentExtraction:
     headline, lead = clean_text(title), clean_text(description)
     text = f"{headline}. {lead}"
     result = AccidentExtraction()
@@ -247,7 +331,9 @@ def extract_accident(title: str | None, description: str | None = None) -> Accid
         result.fatalities = result.injuries = None
         result.incident_types = []
         result.review_reasons.append("negation_or_hypothetical_context")
-    if re.search(MULTI_EVENT_PATTERN, text, re.I):
+    if re.search(MULTI_EVENT_PATTERN, text, re.I) or re.search(
+            r"tin (?:tức )?tai nạn giao thông.*(?:hôm nay|mới nhất)|điểm tin.*tai nạn|^bản tin (?:TNGT|tai nạn)",
+            headline, re.I):
         result.fatalities = result.injuries = None
         result.review_reasons.append("multiple_events_in_article")
     if result.injuries is not None and re.search(r"(?:ban đầu|trước đó).*bị thương.*(?:sau đó|tử vong|không qua khỏi)", lead, re.I):
@@ -261,19 +347,56 @@ def extract_accident(title: str | None, description: str | None = None) -> Accid
     if not result.vehicles:
         result.review_reasons.append("missing_vehicles")
     result.review_reasons = list(dict.fromkeys(result.review_reasons))
+    if content:
+        supplement_body(result, content)
     return result
 
 
-def extract_frame(frame: pl.DataFrame) -> pl.DataFrame:
+def apply_article_location(result: AccidentExtraction, location: ArticleLocation) -> None:
+    result.extraction_version = VNEXPRESS_EXTRACT_VERSION
+    if location.status == "ok" and location.province in PROVINCE_ALIASES:
+        result.evidence["province_dateline"] = [location.text or location.province]
+        result.evidence["province_dateline_url"] = [location.url] if location.url else []
+        if "ambiguous_province" in result.review_reasons or (
+                result.province is not None and result.province != location.province):
+            result.province = None
+            result.review_reasons.append("conflicting_article_province")
+            if "missing_province" not in result.review_reasons:
+                result.review_reasons.append("missing_province")
+        else:
+            result.province = location.province
+            result.review_reasons = [reason for reason in result.review_reasons if reason != "missing_province"]
+    elif result.province is None:
+        result.review_reasons.append(f"article_location_{location.status}")
+    result.review_reasons = list(dict.fromkeys(result.review_reasons))
+
+
+def extract_frame(frame: pl.DataFrame, article_locations: list[ArticleLocation] | None = None) -> pl.DataFrame:
     if "title" not in frame.columns:
         raise ValueError("Extraction input must contain title")
+    if article_locations is not None and len(article_locations) != frame.height:
+        raise ValueError("article_locations must have one entry per input row")
     rows = []
-    for row in frame.iter_rows(named=True):
-        result = asdict(extract_accident(row["title"], row.get("description")))
+    for index, row in enumerate(frame.iter_rows(named=True)):
+        extraction = extract_accident(row["title"], row.get("description"), row.get("content"))
+        if "content" in row and not clean_text(row.get("content")):
+            extraction.review_reasons.append("missing_body")
+        if row.get("accident_label") == "uncertain":
+            extraction.review_reasons.append("upstream_scope_uncertain")
+        if article_locations is not None:
+            apply_article_location(extraction, article_locations[index])
+        result = asdict(extraction)
         result["evidence_json"] = json.dumps(result.pop("evidence"), ensure_ascii=False)
         rows.append(result)
     extracted = pl.DataFrame(rows, schema=EXTRACT_SCHEMA)
-    return frame.with_columns(extracted.get_columns())
+    output = frame.with_columns(extracted.get_columns())
+    if article_locations is not None:
+        metadata = pl.DataFrame([
+            {"article_location_text": item.text, "article_location_status": item.status,
+             "article_location_url": item.url} for item in article_locations
+        ], schema=ARTICLE_LOCATION_SCHEMA)
+        output = output.with_columns(metadata.get_columns())
+    return output
 
 
 def extract_filtered_files() -> None:
@@ -284,7 +407,9 @@ def extract_filtered_files() -> None:
     output_dir = Path(EXTRACT_OUTPUT_DIR)
     output_dir.mkdir(parents=True, exist_ok=True)
     for source, path in inputs.items():
-        result = extract_frame(pl.read_parquet(path))
+        frame = pl.read_parquet(path)
+        locations = fetch_vnexpress_locations(frame) if source == "vnexpress" else None
+        result = extract_frame(frame, article_locations=locations)
         with NamedTemporaryFile(dir=output_dir, suffix=".parquet", delete=False) as temporary:
             temporary_path = Path(temporary.name)
         try:

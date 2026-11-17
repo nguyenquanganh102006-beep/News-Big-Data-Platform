@@ -1,5 +1,10 @@
 # Tiêu chí lọc bài tai nạn giao thông — task 23
 
+Phiên bản hiện hành: [rules-v3-road và phạm vi đã chốt](rules_v3.md).
+Các ví dụ khảo sát bên dưới có trước quyết định này; nếu khác biệt, áp dụng
+rules-v3-road: loại bài chỉ cập nhật sau vụ việc, nhận cháy/vật rơi đè xe trên
+đường, loại sự cố thuần đường thủy và thi công.
+
 Bộ nhãn do trợ lý tự gán và các thống kê phụ thuộc vào bộ nhãn đó đã được loại bỏ. Các tiêu chí dưới đây là hướng dẫn thiết kế bộ lọc, chưa phải kết quả kiểm định chất lượng. Cách đánh giá bằng nhãn được kiểm duyệt: [rules_v1.md](rules_v1.md).
 
 ## Quyết định nhãn
