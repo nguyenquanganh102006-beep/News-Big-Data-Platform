@@ -1,6 +1,7 @@
 """Fetch article bodies only for RSS leads that may describe road accidents."""
 
 from datetime import datetime, timedelta, timezone
+from html import unescape
 import json
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -37,6 +38,7 @@ MAX_BODY_CHARS = 40_000
 FETCH_TIMEOUT = (5, 10)
 REQUEST_DELAY = 0.2
 MISSING_BODY_RETRY_AFTER = timedelta(days=1)
+BODY_MISSING_CACHE_VERSION = 2
 
 
 def valid_article_url(url: str | None, source: str) -> bool:
@@ -110,6 +112,36 @@ def parse_article_body(html: bytes | str, source: str, expected_url: str | None 
     return None
 
 
+def _has_video_object(value, headline: str) -> bool:
+    if isinstance(value, list):
+        return any(_has_video_object(item, headline) for item in value)
+    if isinstance(value, dict):
+        types = value.get("@type", [])
+        if "VideoObject" in (types if isinstance(types, list) else [types]):
+            name = value.get("name") or value.get("headline")
+            return isinstance(name, str) and _plain_text(unescape(name)).casefold() == headline
+        return any(_has_video_object(value.get(key), headline) for key in ("@graph", "mainEntity"))
+    return False
+
+
+def is_video_page(html: bytes | str) -> bool:
+    """Recognize page-level video metadata, not unrelated videos in the sidebar."""
+    soup = BeautifulSoup(html, "html.parser")
+    heading = soup.find("h1")
+    title = (heading.get_text(" ", strip=True) if heading else
+             soup.title.get_text(" ", strip=True) if soup.title else "")
+    headline = _plain_text(unescape(title)).casefold()
+    if not headline:
+        return False
+    for script in soup.select('script[type="application/ld+json"]'):
+        try:
+            if _has_video_object(json.loads(script.string or script.get_text()), headline):
+                return True
+        except (ValueError, TypeError):
+            continue
+    return False
+
+
 def fetch_article_body(url: str | None, source: str, session: requests.Session):
     """Return (body, status, final_url), with bounded same-site redirects."""
     if not valid_article_url(url, source):
@@ -139,8 +171,10 @@ def fetch_article_body(url: str | None, source: str, session: requests.Session):
                     if size > MAX_HTML_BYTES:
                         return None, "too_large", current
                     chunks.append(chunk)
-                body = parse_article_body(b"".join(chunks), source, current)
-                return body, "ok" if body else "body_missing", current
+                html = b"".join(chunks)
+                body = parse_article_body(html, source, current)
+                status = "ok" if body else "video_without_body" if is_video_page(html) else "body_missing"
+                return body, status, current
             finally:
                 response.close()
         return None, "too_many_redirects", current
@@ -159,7 +193,8 @@ def enrich_candidate_bodies(frame: pl.DataFrame, cache_path: Path) -> pl.DataFra
     cache = {}
     if cache_path.is_file():
         cached = pl.read_parquet(cache_path)
-        cache = {row["link"]: (row["content"], row.get("status") or "ok", row.get("checked_at"))
+        cache = {row["link"]: (row["content"], row.get("status") or "ok",
+                               row.get("checked_at"), row.get("missing_version"))
                  for row in cached.iter_rows(named=True)}
 
     cache_changed = False
@@ -173,14 +208,17 @@ def enrich_candidate_bodies(frame: pl.DataFrame, cache_path: Path) -> pl.DataFra
                 statuses[index] = "invalid_url"
                 continue
             if link in cache:
-                cached_body, cached_status, checked_at = cache[link]
+                cached_body, cached_status, checked_at, missing_version = cache[link]
                 if cached_body:
                     bodies[index], statuses[index], urls[index] = cached_body, "cached", link
                     continue
-                if cached_status == "body_missing" and checked_at is not None:
+                if (cached_status in ("body_missing", "video_without_body")
+                        and missing_version == BODY_MISSING_CACHE_VERSION and checked_at is not None):
                     checked = datetime.fromisoformat(checked_at)
                     if datetime.now(timezone.utc) - checked < MISSING_BODY_RETRY_AFTER:
-                        statuses[index], urls[index] = "cached_missing", link
+                        statuses[index], urls[index] = (
+                            "cached_video_without_body" if cached_status == "video_without_body"
+                            else "cached_missing", link)
                         continue
             if last_request is not None:
                 time.sleep(max(0, REQUEST_DELAY - (time.monotonic() - last_request)))
@@ -189,8 +227,9 @@ def enrich_candidate_bodies(frame: pl.DataFrame, cache_path: Path) -> pl.DataFra
             statuses[index], urls[index] = status, final_url
             if body:
                 bodies[index] = body
-            if body or status == "body_missing":
-                cache[link] = (body, status, datetime.now(timezone.utc).isoformat())
+            if body or status in ("body_missing", "video_without_body"):
+                cache[link] = (body, status, datetime.now(timezone.utc).isoformat(),
+                               BODY_MISSING_CACHE_VERSION)
                 cache_changed = True
 
     if cache_changed:
@@ -203,6 +242,7 @@ def enrich_candidate_bodies(frame: pl.DataFrame, cache_path: Path) -> pl.DataFra
                 "content": [entry[0] for entry in cache.values()],
                 "status": [entry[1] for entry in cache.values()],
                 "checked_at": [entry[2] for entry in cache.values()],
+                "missing_version": [entry[3] for entry in cache.values()],
             }).write_parquet(temporary)
             temporary.replace(cache_path)
         finally:

@@ -20,8 +20,10 @@ h1,h2,h3 {letter-spacing:-.035em}
 .intro {color:#60718a;font-size:16px;margin-bottom:24px}
 </style>""", unsafe_allow_html=True)
 
-LABELS = {"accident": "Tai nạn", "uncertain": "Cần xem xét", "not_accident": "Không phải tai nạn"}
+LABELS = {"accident": "Tai nạn", "uncertain": "Cần xem xét", "not_accident": "Không phải tai nạn",
+          "skipped_video": "Video thiếu nội dung"}
 REASONS = {
+    "video_without_body": "Trang video không có thân bài",
     "road_context_missing": "Chưa rõ phương tiện có tham gia giao thông đường bộ",
     "outside_road_scope": "Ngoài phạm vi đường bộ",
     "worksite_excluded": "Tai nạn thi công, ngoài giao thông đường bộ",

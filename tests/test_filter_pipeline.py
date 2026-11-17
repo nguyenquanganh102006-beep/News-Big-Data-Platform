@@ -20,7 +20,8 @@ class FilterPipelineTests(unittest.TestCase):
             original.write_parquet(path)
             contents = path.read_bytes()
             output = Path(tmp, "filtered")
-            expected = {"input": 3, "accident": 1, "not_accident": 1, "uncertain": 1}
+            expected = {"input": 3, "accident": 1, "not_accident": 1, "uncertain": 1,
+                        "skipped_video": 0}
             self.assertEqual(filter_silver_file(path, output), expected)
             self.assertEqual(filter_silver_file(path, output), expected)
             self.assertEqual(path.read_bytes(), contents)

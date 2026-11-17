@@ -86,3 +86,30 @@ RSS hiện chỉ cung cấp các trường đang chọn như tiêu đề, mô t�
 Trong 138 bài chờ mới, 111 bài thiếu tỉnh, 34 bài có dấu hiệu kể nhiều vụ, 30 bài thiếu chi tiết diễn biến và 5 bài có ứng viên nhưng chưa đủ căn cứ ghép. Các lý do có thể chồng nhau. Số bài chờ giảm cho thấy dữ liệu đầy đủ hơn giúp hệ thống đưa ra thêm quyết định; chưa có nhãn độc lập để kết luận độ đúng của toàn bộ các quyết định ghép. Các nhóm ghép có nhiều bài đã được xem theo tiêu đề, không thấy cặp khác vụ rõ ràng trong lượt kiểm tra này.
 
 Database thử nghiệm mới nằm tại `data/evaluation/phase3_body_enriched_338_20261117/events.duckdb`; Parquet xuất nằm trong `exports/` cùng thư mục. Đã chạy lại toàn bộ bước lọc, trích xuất và ghép vụ. Bộ kiểm thử chạy 197 trường hợp: **192 đạt, 5 bỏ qua**. Lần chạy này cần truy cập các trang báo để lấy nội dung; dữ liệu tải về và database thử nghiệm nằm trong `data/`, không được đưa lên GitHub.
+
+## Cập nhật: tự bỏ qua video thiếu thân bài và giải thích bài chờ ghép
+
+Mốc **138 bài chờ** ở trên chưa loại video. Kiểm tra HTML cho thấy các trang video của Báo Xây dựng và Tiền Phong có dữ liệu `VideoObject` nhưng không có thân bài chữ. Bộ lọc nay nhận video bằng tên video trùng tiêu đề trang và chỉ bỏ qua khi không trích được thân bài; lý do được ghi là `video_without_body`, nhãn là `skipped_video`. Bài chữ thiếu thân bài vẫn được giữ. Cache cũ của các trang thiếu thân bài được kiểm tra lại một lần theo quy tắc mới.
+
+| Kết quả sau khi bỏ qua video | Số bài |
+|---|---:|
+| Bài tai nạn ở lần trước | 338 |
+| Video thiếu thân bài được bỏ qua | 73 |
+| Bài đưa vào Phần 3 | 265 |
+| Tạo sự kiện mới | 165 |
+| Ghép vào sự kiện đã có | 18 |
+| Bài đã liên kết | 183 |
+| Bài chờ xem xét | **82** |
+
+Trong 73 video được bỏ qua, 55 bài từng nằm trong nhóm 138 bài chờ và 18 bài từng được tự liên kết. Vì vậy không thể lấy 138 trừ 73 để tính số chờ mới. Một bài khác trước đây chờ đã thành sự kiện mới khi tập bài ứng viên thay đổi. Trong 82 bài còn chờ, 71 bài có thân bài sẵn, 9 bài đã lấy được thân bài từ URL, và chỉ 2 bài chữ vẫn chưa lấy được thân bài. Do đó phần lớn số chờ hiện nay không phải do thiếu nội dung.
+
+| Lý do chính của 82 bài chờ | Số bài | Ví dụ |
+|---|---:|---|
+| Không xác định chắc tỉnh/thành nơi xảy ra vụ | 65 | [Vụ ở Pleiku](https://thanhnien.vn/tai-nan-giao-thong-tai-pleiku-hai-ong-chau-tu-vong-duoi-gam-xe-tai-185251128125441622.htm) có “Gia Lai” trong mô tả nhưng bộ trích xuất vẫn bỏ sót. [Vụ ở Lâm Đồng](https://thanhnien.vn/xe-khach-lao-xuong-vuc-4-nguoi-chet-nhieu-nguoi-bi-thuong-185260406164240372.htm) nhắc cả địa danh cũ Bình Thuận nên bị coi là xung đột. [Cháy xe trên cao tốc Hà Nội – Hải Phòng](https://tienphong.vn/o-to-boc-chay-tren-cao-toc-ha-noi-hai-phong-post1805765.tpo) chỉ nêu tuyến đi qua nhiều địa phương. |
+| Chưa đủ chi tiết để xác nhận một vụ tai nạn cụ thể | 12 | [Bài về hố sụt ở Đà Nẵng](https://www.vietnamplus.vn/can-canh-ho-tu-than-xuat-hien-giua-trung-tam-thanh-pho-da-nang-post1080824.vnp) chủ yếu nói về hiện trạng hố sụt. |
+| Có ứng viên ghép nhưng chứng cứ chưa đủ chắc | 4 | [Vụ 7 ô tô trên cao tốc Phan Thiết – Dầu Giây](https://baoxaydung.vn/cao-toc-phan-thiet-dau-giay-7-o-to-va-cham-lien-hoan-giao-thong-un-tac-keo-dai-192260104170640203.htm). |
+| Một bài kể nhiều vụ cần tách thành các sự kiện riêng | 1 | [Hai vụ trên cao tốc Nội Bài – Lào Cai](https://baoxaydung.vn/lien-tiep-hai-vu-tai-nan-tren-cao-toc-noi-bai-lao-cai-mot-tai-xe-tu-vong-19226030314461267.htm). |
+
+Các hàng trong bảng dùng **lý do chính**, nên cộng đúng 82. Nếu tính mọi lý do cùng xuất hiện trên một bài, có 65 bài thiếu tỉnh, 18 bài kể nhiều vụ, 18 bài thiếu chi tiết và 4 bài ghép chưa chắc. Trong 65 bài thiếu tỉnh, 25 bài bị cờ xung đột địa danh và 17 bài cũng kể nhiều vụ. Có cả bài nước ngoài như [tai nạn ở Nigeria](https://tuoitre.vn/anthony-joshua-thoat-chet-sau-vu-tai-nan-nghiem-trong-o-nigeria-20251230062729713.htm), trong khi trường `province` hiện chỉ chứa tỉnh/thành Việt Nam. Đây là các nguyên nhân khác nhau, không thể xử lý bằng một quy tắc ghép duy nhất. Với các bài đã nêu rõ tỉnh nhưng trích xuất bỏ sót hoặc nhầm địa danh cũ, cần sửa bước trích xuất địa điểm; với bản tin nhiều vụ, cần tách vụ trước khi ghép. Hệ thống vẫn để chờ thay vì tự gán sai địa điểm hoặc gộp nhầm vụ.
+
+Database kiểm thử nằm tại `data/evaluation/phase3_skip_empty_video_265_20261117/events.duckdb`, file xuất ở `exports/` bên cạnh. Đã chạy lại bộ lọc trên 20.953 bài sau khử trùng, trích xuất và ghép toàn bộ 265 bài còn lại. Bộ kiểm thử chạy 199 trường hợp: **194 đạt, 5 bỏ qua**. Dữ liệu và database nằm trong `data/`, không được đưa lên GitHub.

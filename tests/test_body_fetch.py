@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 
 import polars as pl
 
-from filters.body_fetch import fetch_article_body, parse_article_body, valid_article_url
+from filters.body_fetch import fetch_article_body, is_video_page, parse_article_body, valid_article_url
 from filters.run import filter_silver_file
 
 
@@ -37,6 +37,22 @@ class BodyFetchTests(unittest.TestCase):
         html = ("<div class='detail-content'></div>"
                 f"<article><p>{BODY}</p></article>")
         self.assertIsNone(parse_article_body(html, "baoxaydung"))
+
+    def test_video_metadata_is_recognized_without_body(self):
+        html = ('<script type="application/ld+json">'
+                '{"@graph":[{"@type":"NewsArticle"},'
+                '{"@type":"VideoObject","name":"Ô tô tông xe máy"}]}'
+                '</script><h1>Ô tô tông xe máy</h1><div class="detail-content"></div>')
+        self.assertTrue(is_video_page(html))
+        self.assertIsNone(parse_article_body(html, "baoxaydung"))
+        response = Mock(status_code=200, headers={"Content-Type": "text/html"})
+        response.iter_content.return_value = [html.encode()]
+        session = Mock()
+        session.get.return_value = response
+        self.assertEqual(fetch_article_body("https://baoxaydung.vn/a.htm", "baoxaydung", session)[1],
+                         "video_without_body")
+        self.assertFalse(is_video_page('<p>Video liên quan</p>'))
+        self.assertFalse(is_video_page(html.replace('Ô tô tông xe máy</h1>', 'Bài chữ khác</h1>')))
 
     def test_dantri_new_article_container(self):
         html = (f"<article id='articleContent'><div class='desktop-in-article'>"
@@ -73,7 +89,7 @@ class BodyFetchTests(unittest.TestCase):
                 counts = filter_silver_file(path, output)
                 self.assertEqual(fetch.call_count, 2)
             self.assertEqual(counts, {"input": 3, "accident": 2,
-                                      "not_accident": 1, "uncertain": 0})
+                                      "not_accident": 1, "uncertain": 0, "skipped_video": 0})
             classified = pl.read_parquet(output / "classified.parquet")
             self.assertEqual(classified["body_fetch_status"].to_list(), ["ok", "ok", "skipped"])
             self.assertEqual(classified["content"].to_list(), [BODY, BODY, None])
@@ -112,6 +128,24 @@ class BodyFetchTests(unittest.TestCase):
                 self.assertEqual(fetch.call_count, 1)
             row = pl.read_parquet(output / "classified.parquet").row(0, named=True)
             self.assertEqual(row["body_fetch_status"], "cached_missing")
+
+    def test_empty_video_is_skipped_and_cached(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp, "baoxaydung.parquet")
+            output = Path(tmp, "filtered")
+            pl.DataFrame({"source": ["baoxaydung"], "title": ["Ô tô tông xe máy"],
+                          "description": ["Hai xe va chạm."],
+                          "link": ["https://baoxaydung.vn/a.htm"]}).write_parquet(path)
+            with patch("filters.body_fetch.fetch_article_body",
+                       return_value=(None, "video_without_body", "https://baoxaydung.vn/a.htm")) as fetch:
+                first = filter_silver_file(path, output)
+                second = filter_silver_file(path, output)
+            self.assertEqual(fetch.call_count, 1)
+            self.assertEqual(first["skipped_video"], 1)
+            self.assertEqual(second["accident"], 0)
+            row = pl.read_parquet(output / "classified.parquet").row(0, named=True)
+            self.assertEqual(row["body_fetch_status"], "cached_video_without_body")
+            self.assertEqual(row["filter_reason"], "video_without_body")
 
 
 if __name__ == "__main__":

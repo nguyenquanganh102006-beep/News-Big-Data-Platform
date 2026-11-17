@@ -9,8 +9,8 @@ DEDUPLICATED_DATA_DIR = os.path.join(DATA_SILVER_DIR, "deduplicated")
 FILTER_SOURCES = tuple(RSS_SOURCES)
 
 
-VERSION = "rules-v5.3-body-enrichment"
-FILTER_LABELS = ("accident", "not_accident", "uncertain")
+VERSION = "rules-v5.4-skip-empty-video"
+FILTER_LABELS = ("accident", "not_accident", "uncertain", "skipped_video")
 DUPLICATE_SIMILARITY_THRESHOLD = 0.85
 DUPLICATE_WINDOW_HOURS = 24
 DUPLICATE_ALGORITHM_VERSION = "tfidf-charwb-3to5-v1"
