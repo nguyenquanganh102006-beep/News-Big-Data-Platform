@@ -1,5 +1,6 @@
 """Event-first dashboard; articles are evidence, never accident counts."""
 import pandas as pd
+import altair as alt
 import streamlit as st
 import json
 from pathlib import Path
@@ -139,8 +140,35 @@ def render(table):
             st.info("Chưa có vụ với ngày ghi nhận hợp lệ trong lựa chọn này.")
         else:
             st.line_chart(daily[["Sự kiện"]].rename(columns={"Sự kiện": "Vụ tai nạn"}), color="#168b88")
-            st.subheader("Thương vong đã ghi nhận theo ngày")
-            st.line_chart(daily[["Tử vong đã ghi nhận", "Bị thương đã ghi nhận"]])
+            st.subheader("Thương vong đã ghi nhận")
+            period = st.radio("Gộp số liệu theo", ["Ngày", "Tuần", "Tháng"],
+                              index=2 if (daily.index.max() - daily.index.min()).days > 90 else 0,
+                              horizontal=True, key="casualty_period")
+            casualties = daily[["Tử vong đã ghi nhận", "Bị thương đã ghi nhận"]]
+            rule = {"Ngày": "D", "Tuần": "W-MON", "Tháng": "MS"}[period]
+            casualties = casualties.resample(rule, label="left", closed="left").sum(min_count=1)
+            casualties.index.name = "Bắt đầu kỳ"
+            chart_data = casualties.reset_index().melt(
+                id_vars="Bắt đầu kỳ", var_name="Chỉ tiêu", value_name="Số người")
+            chart_data["Kỳ"] = chart_data["Bắt đầu kỳ"].dt.strftime(
+                "%m/%Y" if period == "Tháng" else "%d/%m/%Y")
+            chart = alt.Chart(chart_data.dropna(subset=["Số người"])).mark_bar(
+                cornerRadiusTopLeft=3, cornerRadiusTopRight=3
+            ).encode(
+                x=alt.X("Kỳ:N", sort=casualties.index.strftime(
+                    "%m/%Y" if period == "Tháng" else "%d/%m/%Y").tolist(),
+                    title=None, axis=alt.Axis(labelAngle=-35, labelOverlap=True)),
+                xOffset=alt.XOffset("Chỉ tiêu:N"),
+                y=alt.Y("Số người:Q", title="Số người đã ghi nhận",
+                        axis=alt.Axis(tickMinStep=1)),
+                color=alt.Color("Chỉ tiêu:N", scale=alt.Scale(
+                    domain=["Tử vong đã ghi nhận", "Bị thương đã ghi nhận"],
+                    range=["#dc6258", "#3699b8"]),
+                    legend=alt.Legend(title=None, orient="top")),
+                tooltip=[alt.Tooltip("Kỳ:N", title="Kỳ bắt đầu"), "Chỉ tiêu:N",
+                         alt.Tooltip("Số người:Q", format=".0f")],
+            ).properties(height=300).configure_view(strokeWidth=0)
+            st.altair_chart(chart, width="stretch")
             st.caption("Ngày trống không chứng minh ngoài thực tế không có tai nạn. Thương vong thiếu dữ liệu được giữ trống.")
             st.download_button("Tải thống kê theo ngày", daily.to_csv().encode("utf-8-sig"), "accident_daily.csv", "text/csv")
         left, right = st.columns(2)

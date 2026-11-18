@@ -8,8 +8,8 @@ from .filters import FILTER_SOURCES
 
 EXTRACT_SOURCES = FILTER_SOURCES
 EXTRACT_OUTPUT_DIR = os.path.join(DATA_SILVER_DIR, "accidents")
-EXTRACT_VERSION = "rules-v3.3-scene-location-and-impact"
-VNEXPRESS_EXTRACT_VERSION = "rules-v3.3-scene-location-and-impact+vnexpress-dateline"
+EXTRACT_VERSION = "rules-v3.4-scene-context"
+VNEXPRESS_EXTRACT_VERSION = "rules-v3.4-scene-context+vnexpress-dateline"
 VNEXPRESS_LOCATION_SELECTOR = "p.description span.location-stamp"
 VNEXPRESS_FETCH_TIMEOUT = (5, 20)
 VNEXPRESS_MAX_HTML_BYTES = 2_000_000

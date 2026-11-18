@@ -47,6 +47,13 @@ def is_non_scene(text: str, position: int) -> bool:
     return bool(re.search(NON_SCENE_PATTERN, context, re.I))
 
 
+def has_incident_context(text: str) -> bool:
+    """Shared vocabulary for scene evidence, including fires and road impacts."""
+    return bool(re.search(r"xảy ra|tai nạn|hiện trường|đoạn (?:qua|thuộc)|qua địa bàn|"
+                          r"địa phận|khu vực trên thuộc|khi (?:vừa )?đến|khi (?:vừa )?qua|mất kiểm soát|sụp hố|"
+                          + "|".join(f"(?:{p})" for p in INCIDENT_PATTERNS.values()), text, re.I))
+
+
 def extract_locations(text: str, result: AccidentExtraction) -> None:
     candidates = {}
     for province, aliases in PROVINCE_ALIASES.items():
@@ -72,10 +79,14 @@ def extract_locations(text: str, result: AccidentExtraction) -> None:
                     r"xảy ra|va chạm|tai nạn|đoạn qua|đoạn thuộc địa phận|trên (?:đường|cao tốc)|qua địa bàn|khi đến|sụp hố|trượt ngã",
                     recent, re.I)
                 local_admin = re.search(r"(?:xã|phường|thị trấn|địa phận)\s+[^,()]{1,50}[^)]*$", recent, re.I)
-                parenthetical_scene = bool(re.search(r"\(\s*$", recent) and (scene_nearby or local_admin))
+                named_scene = re.search(
+                    r"\b(?:cầu|quốc lộ|QL|cao tốc|đường)\s+[^,;()!?]{1,70}\(\s*$", recent, re.I)
+                # A province in parentheses qualifies the named scene. The
+                # residence/plate/route guards above still take precedence.
+                parenthetical_scene = bool(re.search(r"\(\s*$", recent) and (
+                    scene_nearby or local_admin or (named_scene and has_incident_context(text))))
                 trailing_scene = bool(re.search(r",\s*$", recent) and (scene_nearby or local_admin))
-                body_dateline = bool(match.start() == 0 and re.search(
-                    r"\b(?:va chạm|tai nạn|tông|đâm|gãy|lật|rơi xuống)\b", text[:180], re.I))
+                body_dateline = bool(match.start() == 0 and has_incident_context(text[:220]))
                 if road or (in_route and not explicit and not (parenthetical_scene or trailing_scene or body_dateline)):
                     continue
                 if explicit or title_start or alias_city or parenthetical_scene or trailing_scene or body_dateline:
@@ -275,7 +286,9 @@ def supplement_body(result: AccidentExtraction, content: str) -> None:
         location = field in ("province", "district", "ward")
         eligible = [(p, raw) for p, raw in zip(parts, paragraphs)
                     if not location or re.search(
-                        r"xảy ra|đoạn (?:qua|thuộc)|qua địa bàn|địa phận|khu vực trên thuộc|khi đến|hiện trường|tông|đâm|lật|gãy", raw, re.I)]
+                        r"xảy ra|đoạn (?:qua|thuộc)|qua địa bàn|địa phận|khu vực trên thuộc|"
+                        r"khi (?:vừa )?đến|khi (?:vừa )?qua|hiện trường|tông|đâm|lật|gãy|"
+                        r"bốc cháy|cháy rụi|mất kiểm soát|sụp hố", raw, re.I)]
         candidates = {getattr(p, field) for p, raw in eligible if getattr(p, field) is not None
                       and (location or getattr(p, field) != 0 or re.search(
                           r"không (?:có|ghi nhận) thương vong|không (?:có )?(?:ai|người nào)\b", raw, re.I))}
@@ -332,8 +345,8 @@ def resolve_scene_province(result: AccidentExtraction, headline: str, lead: str,
         return
     preferred = next(iter(head_candidates), None)
     if preferred is None and content:
-        for paragraph in article_paragraphs(content)[:8]:
-            if not re.search(r"xảy ra|đoạn qua|qua địa bàn|địa phận|khi đến|trên (?:đường|cao tốc)|tai nạn|va chạm|tông|đâm|lật|gãy", paragraph, re.I):
+        for paragraph in article_paragraphs(content):
+            if not has_incident_context(paragraph):
                 continue
             candidate = AccidentExtraction()
             extract_locations(paragraph, candidate)

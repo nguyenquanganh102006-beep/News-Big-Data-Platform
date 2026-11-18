@@ -156,6 +156,48 @@ class BodyExtractionTests(unittest.TestCase):
         r = extract_frame(pl.DataFrame({"title": ["Xe máy va chạm"], "content": [None]})).row(0, named=True)
         self.assertIn("missing_body", r["review_reasons"])
 
+    def test_audited_parenthetical_road_and_bridge_provinces(self):
+        examples = [
+            ("Đầu kéo lao vào hiện trường vụ lật xe",
+             "Sau vụ lật xe đầu kéo trên quốc lộ 8A (Hà Tĩnh), một ô tô khác đâm vào xe gặp nạn.", "Hà Tĩnh"),
+            ("Cầu sắt gãy đôi, máy cày rơi xuống kênh",
+             "Máy cày chở xe cuốc qua cầu Tân Thành (Tây Ninh). Nhịp cầu bất ngờ gãy, xe rơi xuống kênh.", "Tây Ninh"),
+        ]
+        for title, lead, expected in examples:
+            with self.subTest(expected=expected):
+                r = extract_accident(title, lead)
+                self.assertEqual(r.province, expected)
+                self.assertNotIn("missing_province", r.review_reasons)
+
+    def test_audited_dateline_and_fire_body(self):
+        dateline = extract_accident("Ôtô lao xuống hồ Trị An", content=
+            "Đồng Nai Ôtô 5 chỗ mất kiểm soát lao xuống hồ, hai vợ chồng tự thoát ra ngoài.\n"
+            "Chiếc xe mang biển số Khánh Hòa được trục vớt.")
+        self.assertEqual(dateline.province, "Đồng Nai")
+        fire = extract_accident("Cháy container trên quốc lộ 51", content=
+            "Xe chạy theo hướng về TPHCM. Khi vừa qua nút giao Phước Thái "
+            "(xã Phước Thái, Đồng Nai), phần đầu xe bất ngờ bốc cháy.")
+        self.assertEqual(fire.province, "Đồng Nai")
+
+    def test_parenthetical_residence_and_fire_route_are_not_scene(self):
+        residence = extract_accident("Xe tải bốc cháy trên đường", content=
+            "Tài xế quê gần cầu Tân Thành (Tây Ninh) đã thoát khỏi xe đang bốc cháy.")
+        self.assertIsNone(residence.province)
+        route = extract_accident("Xe tải bốc cháy trên cao tốc Hà Nội - Hải Phòng", content=
+            "Tài xế trú tại Hà Nội, chiếc xe mang biển số Hải Phòng.")
+        self.assertIsNone(route.province)
+
+    def test_scene_reference_without_collision_verb_is_preserved(self):
+        r = extract_accident("Xe máy bị tàu tông", content=
+            "Sự việc xảy ra tại đường ngang.\nKhu vực trên thuộc địa bàn phường Đồng Văn, tỉnh Ninh Bình.")
+        self.assertEqual(r.province, "Ninh Bình")
+
+    def test_late_scene_after_background_is_not_truncated(self):
+        body = "\n".join([f"Thông tin xử lý số {i}." for i in range(10)])
+        r = extract_accident("Tàu tông xe tải", content=body +
+            "\nVụ tai nạn xảy ra tại xã Vệ Giang, tỉnh Quảng Ngãi.")
+        self.assertEqual(r.province, "Quảng Ngãi")
+
 
 if __name__ == "__main__":
     unittest.main()
