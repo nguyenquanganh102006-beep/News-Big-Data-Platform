@@ -20,3 +20,13 @@ Suite bao gồm các ca upstream về ghép sập cầu/tai nạn liên hoàn, p
 Log chạy lại thực tế: `data_artifacts/a2_matching_v3_run.log`. Log tests: `data_artifacts/a2_merge_tests_final.log`. Kết quả hiện hành nằm ở `data_artifacts/dashboard_current.json`; báo cáo chuyển A2 trước đó là mốc lịch sử trước khi đổi matching.
 
 Không xóa dữ liệu cũ. Không merge vào `main`. Dịch vụ Python được dừng an toàn để cập nhật rồi khởi động lại sau khi tái dựng kết quả.
+
+## Kết quả kiểm chứng ngày 18/11/2026
+
+- Chạy 230 tests: OK, 5 Redis integration tests bỏ qua theo cấu hình opt-in.
+- Đã tính lại toàn bộ 21.049 URL từ 22.890 message Bronze, không nạp thêm bản trùng.
+- Sau khử trùng: 21.037 bài, gồm 269 bài tai nạn, 33 bài chưa rõ phạm vi, 20.661 bài ngoài phạm vi và 74 trang video thiếu thân bài. Video vẫn được giữ riêng trong catalog.
+- Cả streaming và batch hiện có 196 sự kiện, 217 bài đã gắn và 52 bài chờ review matching. Kết quả bằng nhau ở lần chạy này không có nghĩa hai nhánh luôn cho cùng kết quả.
+- Đọc metadata trong cả hai DB đã xác nhận `hybrid-evidence-v3-scene-corroboration`; batch radius 48h, streaming radius 24h.
+- AppTest kiểm tra cả hai lựa chọn kho trên dashboard: không có exception, cùng hiển thị 196 vụ, 151 tử vong và 120 bị thương đã ghi nhận. Đây là số liệu suy ra từ bằng chứng hiện có, không phải kết quả xác minh thủ công toàn bộ sự kiện.
+- Dữ liệu thay đổi so với báo cáo A2 trước đó do đồng thời cập nhật matching, trích xuất hiện trường và bổ sung/kiểm tra thân bài; không quy toàn bộ chênh lệch cho riêng thuật toán matching.
