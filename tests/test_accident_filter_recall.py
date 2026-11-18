@@ -8,6 +8,18 @@ import polars as pl
 
 
 class AccidentRecallTests(unittest.TestCase):
+    def test_rescue_only_followup_is_excluded(self):
+        decision = classify_accident("Giải cứu tài xế sau vụ tai nạn ở TP.HCM",
+                                     "Lực lượng cứu hộ đưa tài xế ra khỏi cabin.")
+        self.assertEqual(decision.label, "not_accident")
+
+    def test_fallen_roof_without_accident_is_excluded(self):
+        decision = classify_accident(
+            "Gió giật phăng mái tôn, xe tải đỡ giúp người đi đường",
+            "Mái tôn rơi xuống đường cạnh xe tải.",
+            "Gió giật bay mái tôn xuống đường, rất may không gây tai nạn cho người đi đường.")
+        self.assertEqual(decision.label, "not_accident")
+
     def test_full_audit_scope_boundaries(self):
         cases = [
             ("Clip: Đất sạt xuống quốc lộ", "Xe máy người đi đường bị vùi lấp.", None, "accident"),
@@ -95,6 +107,7 @@ class AccidentRecallTests(unittest.TestCase):
             "Xe máy điện an toàn như ô tô, có va chạm cũng không dễ văng ra",
             "Thử nghiệm va chạm để đánh giá độ an toàn xe SUV",
             "Toàn quốc xảy ra 381 vụ tai nạn giao thông trong 9 ngày nghỉ Tết",
+            "Liên tục xảy ra tai nạn trên đường ven biển dù chưa đưa vào khai thác",
             "Số người tử vong do TNGT giảm 23%",
             "Thăm hỏi gia đình nạn nhân vụ tai nạn giao thông",
             "Tài xế gây tai nạn lãnh 30 tháng tù giam",
@@ -106,6 +119,7 @@ class AccidentRecallTests(unittest.TestCase):
             "Xe lu cán công nhân trên công trường đang thi công",
             "Xe tăng húc vào phương tiện của lực lượng gìn giữ hòa bình",
             "Cứu sống bệnh nhân chấn thương nặng sau tai nạn giao thông",
+            "Khánh Hòa: Ưu tiên mổ cấp cứu, nhiều nạn nhân vụ sạt lở đèo qua cơn nguy kịch",
             "Cháy lớn tại bãi giữ ô tô, nhiều xe trơ khung",
             "Gặp xe hỏng, vật cản trên đường có vạch liền: Ô tô được lấn vạch để tránh?",
         ]
@@ -127,6 +141,13 @@ class AccidentRecallTests(unittest.TestCase):
         self.assertEqual(classify_accident("Sự cố ở ngã tư", "Ô tô đang đi qua giao lộ. Xe máy lao tới đâm mạnh vào ô tô, làm một người bị thương.").label, "accident")
         metrics, _ = evaluate([{"sample_id": "body", "label": "accident", **frame.row(0, named=True)}])
         self.assertEqual(metrics["recall_accident"], 1)
+
+    def test_weather_damage_needs_moving_vehicle_evidence(self):
+        title = "Mưa lớn, gió giật mạnh làm cây đổ đè trúng ô tô"
+        body = "Nhiều cây đổ trên đường, có cây đè phương tiện của người dân."
+        self.assertEqual(classify_accident(title, content=body).label, "uncertain")
+        moving = "Ô tô đang lưu thông trên đường thì bị cây đổ đè trúng, tài xế bị thương."
+        self.assertEqual(classify_accident(title, content=moving).label, "accident")
 
 
 if __name__ == "__main__":

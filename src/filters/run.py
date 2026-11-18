@@ -8,6 +8,7 @@ from config import (
     FILTER_SOURCES, FILTER_LABELS,
 )
 from .accident import classify_accident
+from .body_fetch import enrich_candidate_bodies
 from preprocessors.content_dedup import run_content_dedup
 
 
@@ -40,7 +41,22 @@ def filter_silver_file(input_path: Path, output_dir: Path) -> dict[str, int]:
     frame = pl.read_parquet(input_path)
     if "is_duplicate" in frame.columns:
         frame = frame.filter(~pl.col("is_duplicate").fill_null(False))
-    classified = filter_frame(frame)
+    # The RSS lead gives a cheap first pass. Fetch full text only for articles
+    # that may be accidents, then make the final decision with that text.
+    preliminary = filter_frame(frame)
+    enriched = enrich_candidate_bodies(preliminary, output_dir / "body_cache.parquet")
+    classified = filter_frame(enriched)
+    # A video page with no article text cannot supply evidence for event matching.
+    # Keep it separate from news that is actually unrelated to accidents.
+    if "body_fetch_status" in classified.columns:
+        video_without_body = pl.col("body_fetch_status").is_in(
+            ["video_without_body", "cached_video_without_body"])
+        classified = classified.with_columns(
+            pl.when(video_without_body).then(pl.lit("skipped_video"))
+            .otherwise(pl.col("accident_label")).alias("accident_label"),
+            pl.when(video_without_body).then(pl.lit("video_without_body"))
+            .otherwise(pl.col("filter_reason")).alias("filter_reason"),
+        )
     partitions = {label: classified.filter(pl.col("accident_label") == label)
                   for label in FILTER_LABELS}
     write_parquet_atomic(classified, output_dir / "classified.parquet")

@@ -49,6 +49,16 @@ class HistoricalBronzeTests(unittest.TestCase):
                 self.assertEqual(len(bronze_snapshots()["dantri"]), 2)
                 self.assertEqual([p.name for p in bronze_snapshots("2026-11-16")["dantri"]], ["20261116_080000.parquet"])
 
+    def test_discovery_finds_unpacked_bronze_archive(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            nested = root / "bronze" / "bronze" / "dantri"
+            nested.mkdir(parents=True)
+            archive_file = nested / "history_00000001_00000100.parquet"
+            pl.DataFrame({"title": ["fixture"]}).write_parquet(archive_file)
+            with patch("preprocessors.run.DATA_DIR", root), patch("preprocessors.run.DATA_ARTIFACTS_DIR", root / "artifacts"), patch("preprocessors.run.RSS_SOURCES", {"dantri": {}}):
+                self.assertEqual(bronze_snapshots()["dantri"], [archive_file])
+
     def test_streaming_snapshot_includes_receipts_and_is_independent(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

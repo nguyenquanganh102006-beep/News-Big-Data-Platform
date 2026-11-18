@@ -10,6 +10,7 @@ from config.extractors import EXTRACT_SCHEMA
 from extractors.accident import extract_frame
 from extractors.vnexpress import fetch_vnexpress_locations
 from filters.accident import classify_accident
+from filters.body_fetch import enrich_candidate_bodies
 from filters.run import write_parquet_atomic
 from preprocessors.content_dedup import detect_duplicate_articles
 from streaming.pipeline import clean_article
@@ -17,13 +18,13 @@ from streaming.message import normalize_article
 from .state import signature
 from .config import atomic_json
 
-OUTPUT = ["accident_label", "filter_reason", "filter_evidence", "filter_version", "review_override_applied", *EXTRACT_SCHEMA]
+OUTPUT = ["content", "body_fetch_status", "body_fetch_url", "accident_label", "filter_reason", "filter_evidence", "filter_version", "review_override_applied", *EXTRACT_SCHEMA]
 REVIEW = Path(DATA_ARTIFACTS_DIR) / "filter_review_20261117/full_review/reviewed_classified.parquet"
 
 
 def version():
     root = Path(__file__).resolve().parents[1]
-    paths = [root / name for name in ("a2/processing.py", "filters/accident.py", "config/filters.py", "extractors/accident.py", "config/extractors.py", "preprocessors/content_dedup.py", "streaming/message.py", "streaming/pipeline.py", "a2/state.py", "events/profile.py", "events/service.py", "config/events.py")]
+    paths = [root / name for name in ("a2/processing.py", "filters/accident.py", "filters/body_fetch.py", "config/filters.py", "extractors/accident.py", "config/extractors.py", "preprocessors/content_dedup.py", "streaming/message.py", "streaming/pipeline.py", "a2/state.py", "events/profile.py", "events/matching.py", "events/service.py", "config/events.py")]
     digest = hashlib.sha256(b"".join(path.read_bytes() for path in paths))
     if REVIEW.exists():
         digest.update(REVIEW.read_bytes())
@@ -72,6 +73,19 @@ def prepare(frame, directory, annotations=None, enrich=True):
                            filter_version=decision.version + "+reviewed-input", review_override_applied=True)
             if row["is_duplicate"]:
                 row.update(accident_label="duplicate", filter_reason="content_duplicate")
+            # Use the upstream body evidence before extraction/matching. Keep
+            # Bronze and its fingerprint intact; fetched text belongs to Silver.
+            if enrich and row["accident_label"] in ("accident", "uncertain"):
+                row = enrich_candidate_bodies(
+                    pl.DataFrame([row], infer_schema_length=None),
+                    directory / "body_cache" / f"{row['source']}.parquet",
+                ).row(0, named=True)
+                if not row["review_override_applied"]:
+                    decision = classify_accident(row["title"], row.get("description"), row.get("content"))
+                    row.update(accident_label=decision.label, filter_reason=decision.reason,
+                               filter_evidence=decision.evidence, filter_version=decision.version)
+                if row.get("body_fetch_status") in ("video_without_body", "cached_video_without_body"):
+                    row.update(accident_label="skipped_video", filter_reason="video_without_body")
             if row["accident_label"] == "accident":
                 row = extract_frame(pl.DataFrame([row], infer_schema_length=None)).row(0, named=True)
                 if row["source"] == "vnexpress":

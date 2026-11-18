@@ -121,7 +121,7 @@ def compare_profiles(left, right):
     # Require corroboration from a different family of attributes. Same topic,
     # province, date and generic vehicle class alone do not identify an event.
     named_identity = bool(shared_places and vehicles and (dates_agree or same_day))
-    identifier_identity = bool(identifiers and (roles or shared_places) and same_province and delta <= 24)
+    identifier_identity = bool(identifiers and (roles or shared_places) and same_province and delta <= 48)
     context_identity = bool(roles and scenes and vehicles and same_province and (dates_agree or same_day) and delta <= 12)
     strength = 1.0 if named_identity or identifier_identity else (0.85 if context_identity else None)
     return {"conflicts": sorted(set(conflicts)), "shared_places": shared_places,

@@ -153,6 +153,13 @@ def classify_accident(title: str | None, description: str | None = None,
         return result("uncertain", "missing_title")
     roundup = has(ROUNDUP, headline)
     body_opening = normalize(content)[:2200]
+    if (has(r"giải cứu", headline) and has(r"sau (?:vụ )?tai nạn", headline)
+            and not has(IMPACT, headline) and not has(IMPACT, body_opening)):
+        return result("not_accident", "followup_excluded")
+    if (has(r"không gây tai nạn|không xảy ra tai nạn", body_opening[:700])
+            and has(r"mái tôn|cây|vật rơi", headline)
+            and not has(r"bị thương|tử vong|hư hỏng|va chạm|tông|đâm", body_opening[:700])):
+        return result("not_accident", "object_near_miss")
     # A bulletin's discrete news item is primary reporting, unlike an old crash
     # cited as background in a policy or advice article.
     if re.search(r"^(?:bản tin|chuyển động|xem nhanh|toàn cảnh)", body_opening):
@@ -221,7 +228,7 @@ def classify_accident(title: str | None, description: str | None = None,
         return result("not_accident", "human_interest_followup")
     if has(r"đau thương.{0,20}gia đình|tiếng khóc|tang lễ", lead) and not has(r"tông|đâm|va chạm|cán|lật|lao vào", headline):
         return result("uncertain", "bereavement_or_incident_report")
-    if has(r"cứu sống|cứu chữa|phẫu thuật|bệnh viện", headline) and not has(r"tại chỗ|hiện trường|cắt cabin", headline):
+    if has(r"cứu sống|cứu chữa|phẫu thuật|bệnh viện|mổ cấp cứu|ưu tiên mổ", headline) and not has(r"tại chỗ|hiện trường|cắt cabin", headline):
         return result("not_accident", "medical_followup")
     if has(r"bịa đặt|tin giả|sai sự thật|không xảy ra|dựng hiện trường giả", text):
         return result("not_accident", "unverified_or_fake_incident")
@@ -264,7 +271,7 @@ def classify_accident(title: str | None, description: str | None = None,
     if has(r"cháy.{0,35}(?:gara|xưởng|nhà máy|bãi (?:giữ|đậu|đỗ)|cửa hàng xe)|(?:gara|xưởng|nhà máy|bãi giữ).{0,35}cháy", headline):
         return result("not_accident", "nontraffic_fire")
 
-    if not roundup and not detailed_crash_report and (has(r"thống kê|kéo giảm|giảm.{0,30}(?:tiêu chí|tai nạn)|(?:tai nạn|tngt).{0,25}giảm|ngày.{0,20}nghỉ tết|trong.{0,20}ngày nghỉ|toàn quốc xảy ra|nửa đầu năm|kiểm soát tngt", headline)
+    if not roundup and not detailed_crash_report and (has(r"thống kê|kéo giảm|giảm.{0,30}(?:tiêu chí|tai nạn)|(?:tai nạn|tngt).{0,25}giảm|liên tục xảy ra tai nạn|ngày.{0,20}nghỉ tết|trong.{0,20}ngày nghỉ|toàn quốc xảy ra|nửa đầu năm|kiểm soát tngt", headline)
                         or re.search(r"\d+\s+vụ tai nạn|\d+ người tử vong do tai nạn giao thông ngày", headline)):
         return result("not_accident", "aggregate_statistics")
     if has(r"diễn tập|giả định|thử nghiệm|thử va chạm|thử nghiệm chống chấn thương", text):
@@ -276,6 +283,12 @@ def classify_accident(title: str | None, description: str | None = None,
         return result("not_accident", "advice_or_hypothetical")
     if has(r"sau (?:vụ|sự cố).*?(?:dự kiến|xây|sửa)|dự kiến.*sau sự cố", headline):
         return result("not_accident", "followup_excluded")
+    if (has(r"mưa lớn|gió giật|bão|dông", headline)
+            and has(r"cây.{0,30}(?:đổ|gãy).{0,25}(?:đè|trúng).{0,20}(?:ô tô|ôtô|xe)", headline)
+            and not has(r"(?:xe|ô tô|ôtô).{0,25}(?:đang lưu thông|đang chạy|đang di chuyển)|"
+                        r"(?:tài xế|người lái).{0,35}(?:bị thương|tử vong)",
+                        text + " " + body_opening[:700])):
+        return result("uncertain", "weather_damage_vehicle_movement_unknown")
     if (has(r"suýt|né tai nạn|né tránh trong gang tấc", text)
             and not has(IMPACT, actual_text(text))
             and not primary_report("", body_opening)):

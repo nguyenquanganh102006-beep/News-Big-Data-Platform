@@ -65,7 +65,7 @@ Giữ các cột đầu vào (kể cả article_key/source/link), bổ sung ho�
 | accident_label | accident / not_accident / uncertain |
 | filter_reason | Mã luật quyết định |
 | filter_evidence | Tiêu đề hoặc lead đã chuẩn hóa dùng ở nhánh quyết định |
-| filter_version | rules-v3-road |
+| filter_version | Phiên bản quy tắc hiện hành trong `src/config/filters.py` |
 
 Output lọc là bản dựng lại từ Silver hiện tại, được thay thế mỗi lần chạy; không append gây trùng qua các lần chạy. File của nhóm không có bài vẫn được ghi rỗng với schema đầy đủ để không giữ kết quả cũ. Không sửa input Silver. Thư mục output tự tạo; data đã có trong `.gitignore`.
 

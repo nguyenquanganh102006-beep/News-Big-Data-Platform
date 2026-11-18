@@ -19,10 +19,8 @@ Các thay đổi được làm trên nhánh `task/32-33`, nối tiếp code 3.1 
 Trong lần kiểm tra ban đầu ngày **04/11/2026**:
 
 - Lấy được tổng cộng **410 bản tin RSS từ 7 nguồn** trong một lần crawl.
-- Ở lần kiểm tra lịch sử này, luồng downstream mới xử lý VnExpress, VietnamPlus
-  và Tuổi Trẻ, tổng cộng **160 bài** sau làm sạch và loại trùng URL. Luồng hiện
-  tại đã mở preprocessing/filter/extraction cho cả 7 nguồn RSS; xem
-  [sơ đồ luồng và các hướng dẫn chi tiết](../flow.md).
+- Ba nguồn có bước xử lý tiếp hiện nay là VnExpress, VietnamPlus, Tuổi Trẻ.
+  Ba nguồn này có tổng cộng **160 bài** sau làm sạch và loại trùng URL.
 - Bộ lọc chọn **5 bài** để trích xuất thông tin tai nạn; còn **2 bài** thuộc nhóm
   chưa rõ của bộ lọc, chưa chuyển sang bước sự kiện.
 - Database đã lưu **5 bài**, tạo **2 sự kiện**, liên kết **2 bài** vào các sự kiện
@@ -252,7 +250,8 @@ và có kế hoạch xử lý lại dữ liệu cũ; không xóa database để 
   [cập nhật VnExpress và lưu ý với database cũ](accident_extraction.md).
 - Mốc so sánh hiện là **ngày đăng bài**, chưa phải ngày tai nạn thực sự xảy ra.
   Trường `time_occurred` để trống khi chưa có bằng chứng, không điền ngày đăng thay thế.
-  Bài về cùng vụ nhưng đăng muộn hơn bán kính 48 giờ có thể bị tách thành sự kiện mới.
+  Bài về cùng vụ nhưng đăng muộn hơn cửa sổ 48 giờ có thể bị tách thành sự kiện mới,
+  trừ khi có ngày xảy ra và địa điểm cụ thể để xét theo nhánh tin theo dõi muộn.
 - Chưa có trường tên đường riêng từ bước trích xuất. Phần so địa điểm chi tiết
   đang dùng quận/huyện và phường/xã khi có.
 - Chưa đo độ đúng bằng tập bài thật được con người đánh dấu cùng/khác vụ.

@@ -263,7 +263,9 @@ provisional và các bài chờ review. Dashboard chỉ đọc; xem
 ### 10. Chạy lại dữ liệu Bronze lịch sử
 
 Bronze nhập từ crawler lịch sử có tên `history_<id đầu>_<id cuối>.parquet`,
-đặt trong `data/bronze/<source>/` cùng các snapshot RSS cũ. Preprocessor
+đặt trong `data/bronze/<source>/` cùng các snapshot RSS cũ. Nếu giải nén gói
+`bronze.zip` ngay trong thư mục này, cấu trúc `data/bronze/bronze/<source>/`
+cũng được nhận. Preprocessor
 nhận cả hai định dạng, chuẩn hóa ngày đăng và giữ `content` của bài lịch sử
 trong Silver để matcher sử dụng. Các file Bronze được giữ nguyên.
 

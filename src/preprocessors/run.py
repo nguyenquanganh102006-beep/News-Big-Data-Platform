@@ -21,7 +21,10 @@ def bronze_snapshots(crawled_date: str | None = None, fingerprint_cache=None):
             raise ValueError("crawled_date must be YYYY-MM-DD or YYYY-MM-DD hh:mm:ss")
         prefix = parsed.strftime("%Y%m%d" if len(crawled_date) == 10 else "%Y%m%d_%H%M%S")
 
-    bases = [Path(DATA_DIR), *(Path(path) for path in sorted((Path(DATA_ARTIFACTS_DIR) / "diagnostics").glob("*/data")))]
+    # Historical exports may be unpacked as data/bronze/bronze/<source>/.
+    # Treat that directory as another data root while keeping the usual layout.
+    bases = [Path(DATA_DIR), Path(DATA_DIR) / "bronze",
+             *(Path(path) for path in sorted((Path(DATA_ARTIFACTS_DIR) / "diagnostics").glob("*/data")))]
     discovered = {}
     for base in bases:
         for source in RSS_SOURCES:

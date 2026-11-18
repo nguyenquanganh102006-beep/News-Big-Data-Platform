@@ -31,12 +31,17 @@ def clean_text(value: str | None) -> str:
     return re.sub(r"\s+", " ", unicodedata.normalize("NFC", text)).strip()
 
 
+def _protect_admin_abbreviations(text: str) -> str:
+    return re.sub(r"\b(TP|P|Q)\.\s+", r"\1  ", text, flags=re.I)
+
+
 def clause_prefix(text: str, position: int) -> str:
-    return re.split(r"[,;!?\n]|\.(?:\s|$)|\b(?:nhưng|tuy nhiên|song)\b", text[:position], flags=re.I)[-1]
+    return re.split(r"[,;!?\n]|\.(?:\s|$)|\b(?:nhưng|tuy nhiên|song)\b",
+                    _protect_admin_abbreviations(text[:position]), flags=re.I)[-1]
 
 
 def is_non_scene(text: str, position: int) -> bool:
-    sentence = re.split(r"[;!?]|\.(?:\s|$)", text[:position])[-1]
+    sentence = re.split(r"[;!?]|\.(?:\s|$)", _protect_admin_abbreviations(text[:position]))[-1]
     # A residence/hospital location can continue after a comma into its province.
     context = re.split(SCENE_PATTERN, sentence, flags=re.I)[-1].replace(",", " ")
     return bool(re.search(NON_SCENE_PATTERN, context, re.I))
@@ -47,6 +52,12 @@ def extract_locations(text: str, result: AccidentExtraction) -> None:
     for province, aliases in PROVINCE_ALIASES.items():
         for alias in aliases:
             for match in re.finditer(r"(?<!\w)" + re.escape(alias) + r"(?!\w)", text, flags=re.I):
+                if not alias.casefold().startswith("tp") and re.search(r"\bTP\.\s*$", text[:match.start()], re.I):
+                    continue  # The complete TP. alias handles this location and its road context.
+                if re.search(r"\b(?:công an|cảnh sát|đội CSGT)\s+(?:TP\.?\s*)?$", text[:match.start()], re.I):
+                    continue
+                if re.search(r"\bhướng\s+[^,;.!?]{0,55}[-–]\s*(?:TP\.?\s*)?$", text[:match.start()], re.I):
+                    continue
                 prefix = clause_prefix(text, match.start())
                 if is_non_scene(text, match.start()):
                     continue
@@ -56,9 +67,18 @@ def extract_locations(text: str, result: AccidentExtraction) -> None:
                 explicit = re.search(LOCATION_CONTEXT_PATTERN, prefix, flags=re.I)
                 title_start = match.start() == 0 and bool(re.match(r"\s*(?::|[-–])", text[match.end():]))
                 alias_city = bool(re.match(r"tp\.?|tphcm", alias, flags=re.I))
-                if road or (in_route and not explicit):
+                recent = text[max(0, match.start() - 130):match.start()]
+                scene_nearby = re.search(
+                    r"xảy ra|va chạm|tai nạn|đoạn qua|đoạn thuộc địa phận|trên (?:đường|cao tốc)|qua địa bàn|khi đến|sụp hố|trượt ngã",
+                    recent, re.I)
+                local_admin = re.search(r"(?:xã|phường|thị trấn|địa phận)\s+[^,()]{1,50}[^)]*$", recent, re.I)
+                parenthetical_scene = bool(re.search(r"\(\s*$", recent) and (scene_nearby or local_admin))
+                trailing_scene = bool(re.search(r",\s*$", recent) and (scene_nearby or local_admin))
+                body_dateline = bool(match.start() == 0 and re.search(
+                    r"\b(?:va chạm|tai nạn|tông|đâm|gãy|lật|rơi xuống)\b", text[:180], re.I))
+                if road or (in_route and not explicit and not (parenthetical_scene or trailing_scene or body_dateline)):
                     continue
-                if explicit or title_start or alias_city:
+                if explicit or title_start or alias_city or parenthetical_scene or trailing_scene or body_dateline:
                     candidates[province] = match.group()
     if len(candidates) == 1:
         result.province = next(iter(candidates))
@@ -255,7 +275,7 @@ def supplement_body(result: AccidentExtraction, content: str) -> None:
         location = field in ("province", "district", "ward")
         eligible = [(p, raw) for p, raw in zip(parts, paragraphs)
                     if not location or re.search(
-                        r"xảy ra|đoạn (?:qua|thuộc)|địa phận|khu vực trên thuộc|khi đến|hiện trường", raw, re.I)]
+                        r"xảy ra|đoạn (?:qua|thuộc)|qua địa bàn|địa phận|khu vực trên thuộc|khi đến|hiện trường|tông|đâm|lật|gãy", raw, re.I)]
         candidates = {getattr(p, field) for p, raw in eligible if getattr(p, field) is not None
                       and (location or getattr(p, field) != 0 or re.search(
                           r"không (?:có|ghi nhận) thương vong|không (?:có )?(?:ai|người nào)\b", raw, re.I))}
@@ -285,6 +305,8 @@ def supplement_body(result: AccidentExtraction, content: str) -> None:
             result.evidence.setdefault(field, []).extend(p.evidence.get(field, []))
     if "multiple_events_in_article" in result.review_reasons:
         result.fatalities = result.injuries = None
+        result.province = None
+        result.evidence.pop("province", None)
     for field in ("province", "district", "fatalities", "injuries", "vehicles"):
         if getattr(result, field) is not None and getattr(result, field) != []:
             result.review_reasons = [r for r in result.review_reasons if r != f"missing_{field}"]
@@ -294,6 +316,35 @@ def supplement_body(result: AccidentExtraction, content: str) -> None:
         result.review_reasons = [r for r in result.review_reasons if r != "missing_incident_details"]
     result.review_reasons = list(dict.fromkeys(result.review_reasons))
     result.evidence = {k: list(dict.fromkeys(v)) for k, v in result.evidence.items()}
+
+
+def resolve_scene_province(result: AccidentExtraction, headline: str, lead: str,
+                           content: str | None) -> None:
+    """Prefer a single explicit incident location over incidental body mentions."""
+    if result.province is not None or "multiple_events_in_article" in result.review_reasons:
+        return
+    title_location = AccidentExtraction()
+    lead_location = AccidentExtraction()
+    extract_locations(headline, title_location)
+    extract_locations(lead, lead_location)
+    head_candidates = {p for p in (title_location.province, lead_location.province) if p}
+    if len(head_candidates) > 1:
+        return
+    preferred = next(iter(head_candidates), None)
+    if preferred is None and content:
+        for paragraph in article_paragraphs(content)[:8]:
+            if not re.search(r"xảy ra|đoạn qua|qua địa bàn|địa phận|khi đến|trên (?:đường|cao tốc)|tai nạn|va chạm|tông|đâm|lật|gãy", paragraph, re.I):
+                continue
+            candidate = AccidentExtraction()
+            extract_locations(paragraph, candidate)
+            if candidate.province:
+                preferred = candidate.province
+                break
+    if preferred:
+        result.province = preferred
+        result.evidence.setdefault("province_scene_resolution", []).append(preferred)
+        result.review_reasons = [reason for reason in result.review_reasons
+                                 if reason not in ("missing_province", "conflicting_province", "ambiguous_province")]
 
 
 def extract_accident(title: str | None, description: str | None = None,
@@ -332,9 +383,11 @@ def extract_accident(title: str | None, description: str | None = None,
         result.incident_types = []
         result.review_reasons.append("negation_or_hypothetical_context")
     if re.search(MULTI_EVENT_PATTERN, text, re.I) or re.search(
-            r"tin (?:tức )?tai nạn giao thông.*(?:hôm nay|mới nhất)|điểm tin.*tai nạn|^bản tin (?:TNGT|tai nạn)",
+            r"tin (?:tức )?tai nạn giao thông.*(?:hôm nay|mới nhất)|điểm tin.*tai nạn|^bản tin (?:TNGT|tai nạn)|^(?:toàn cảnh|xem nhanh).*\|",
             headline, re.I):
         result.fatalities = result.injuries = None
+        result.province = None
+        result.evidence.pop("province", None)
         result.review_reasons.append("multiple_events_in_article")
     if result.injuries is not None and re.search(r"(?:ban đầu|trước đó).*bị thương.*(?:sau đó|tử vong|không qua khỏi)", lead, re.I):
         result.injuries = None
@@ -349,11 +402,18 @@ def extract_accident(title: str | None, description: str | None = None,
     result.review_reasons = list(dict.fromkeys(result.review_reasons))
     if content:
         supplement_body(result, content)
+    resolve_scene_province(result, headline, lead, content)
+    if "multiple_events_in_article" in result.review_reasons:
+        result.province = None
+        if "missing_province" not in result.review_reasons:
+            result.review_reasons.append("missing_province")
     return result
 
 
 def apply_article_location(result: AccidentExtraction, location: ArticleLocation) -> None:
     result.extraction_version = VNEXPRESS_EXTRACT_VERSION
+    if "multiple_events_in_article" in result.review_reasons:
+        return
     if location.status == "ok" and location.province in PROVINCE_ALIASES:
         result.evidence["province_dateline"] = [location.text or location.province]
         result.evidence["province_dateline_url"] = [location.url] if location.url else []

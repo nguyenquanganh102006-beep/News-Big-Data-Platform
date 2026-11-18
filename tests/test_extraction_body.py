@@ -43,6 +43,90 @@ class BodyExtractionTests(unittest.TestCase):
         self.assertEqual(r.province, "Hà Nội")
         self.assertEqual(r.vehicles, ["xe máy"])
 
+    def test_driver_residence_does_not_override_crash_province(self):
+        r = extract_accident(
+            "Đồng Tháp: Xe khách lao vào lề đường",
+            content="Tại tỉnh Đồng Tháp, xe khách va chạm với ba người bên đường. "
+                    "Tài xế ngụ tỉnh An Giang đang điều khiển xe.")
+        self.assertEqual(r.province, "Đồng Tháp")
+
+    def test_route_destination_does_not_override_crash_province(self):
+        r = extract_accident(
+            "Lâm Đồng: Xe bán tải va chạm xe đầu kéo",
+            content="Vụ tai nạn xảy ra đoạn qua xã Quảng Tín, tỉnh Lâm Đồng. "
+                    "Xe bán tải chạy theo hướng từ Lâm Đồng đi TP Đồng Nai.")
+        self.assertEqual(r.province, "Lâm Đồng")
+
+    def test_scene_after_plate_and_route_is_not_lost(self):
+        r = extract_accident(
+            "Ô tô bốc cháy trên cao tốc",
+            content="Xe mang biển số 61A chạy trên cao tốc TP. Hồ Chí Minh - Trung Lương, "
+                    "khi đến đoạn qua xã Tân Hương, tỉnh Đồng Tháp thì bốc cháy.")
+        self.assertEqual(r.province, "Đồng Tháp")
+
+    def test_city_abbreviation_is_scene_not_road_name(self):
+        r = extract_accident(
+            "Tai nạn liên hoàn trên đường Hồ Chí Minh",
+            "Vụ tai nạn xảy ra tại xã A Lưới 4, TP. Huế khiến hai người tử vong.")
+        self.assertEqual(r.province, "Huế")
+
+    def test_parenthetical_province_after_scene_ward(self):
+        r = extract_accident(
+            "Xe con lật trên cao tốc",
+            content="Vụ tai nạn xảy ra tại Km217 cao tốc Pháp Vân, "
+                    "đoạn thuộc địa phận P.Đồng Văn (Ninh Bình). Xe con lật ngửa.")
+        self.assertEqual(r.province, "Ninh Bình")
+
+    def test_dateline_with_incident_in_first_paragraph(self):
+        r = extract_accident("Xe ben tông xe tải trên cầu",
+                             content="Hà Nội Xe ben tông xe tải trên cầu Nhật Tân, đêm 1/11.")
+        self.assertEqual(r.province, "Hà Nội")
+        r = extract_accident("Xe ben gây tai nạn liên hoàn trên cầu",
+                             content="Hà Nội Xe ben từ phía sau lao tới gây tai nạn liên hoàn trên cầu Nhật Tân.")
+        self.assertEqual(r.province, "Hà Nội")
+
+    def test_train_route_and_police_office_are_not_scene(self):
+        r = extract_accident(
+            "Xe máy bị tàu hỏa tông",
+            content="Công an TP.HCM cho biết tàu chạy hướng Hà Nội - TP.HCM. "
+                    "Vụ tai nạn xảy ra tại phường Đồng Văn, tỉnh Ninh Bình.")
+        self.assertEqual(r.province, "Ninh Bình")
+
+    def test_roundup_and_route_endpoints_do_not_get_forced_province(self):
+        roundup = extract_accident("Toàn cảnh | Hai vụ tai nạn tại Hà Nội và Huế",
+                                   "Hai xe máy va chạm, ba người bị thương.")
+        self.assertIsNone(roundup.province)
+        self.assertIn("multiple_events_in_article", roundup.review_reasons)
+        route = extract_accident("Xe tải bốc cháy trên cao tốc Hà Nội - Hải Phòng")
+        self.assertIsNone(route.province)
+
+    def test_incident_details_cover_real_road_impacts(self):
+        examples = (
+            ("Xe máy va quẹt taxi trên đường", "va_quet"),
+            ("Ô tô sụt xuống hố giữa đường", "sut_ho"),
+            ("Cây đổ trúng xe máy trên đường", "vat_de_xe"),
+            ("Xe máy bị nước lũ cuốn trôi trên đường", "nuoc_cuon_xe"),
+            ("Sét đánh trúng người đang chạy xe máy trên đường", "set_danh_nguoi_di_xe"),
+            ("Xe máy bị vùi lấp do sạt lở trên quốc lộ", "xe_bi_vui_lap"),
+            ("Nhiều xe đâm dồn toa trên cao tốc", "va_cham"),
+        )
+        for title, expected in examples:
+            with self.subTest(title=title):
+                r = extract_accident(title)
+                self.assertIn(expected, r.incident_types)
+                self.assertNotIn("missing_incident_details", r.review_reasons)
+
+    def test_residence_word_does_not_match_inside_other_words(self):
+        r = extract_accident("Xe máy bốc cháy ngùn ngụt trên cầu ở TPHCM")
+        self.assertEqual(r.province, "TP Hồ Chí Minh")
+
+    def test_vehicle_crossing_local_area_sets_scene_province(self):
+        r = extract_accident(
+            "Xe khách bốc cháy trơ khung",
+            content="Xe khách lưu thông qua địa bàn xã Hòa Xuân (tỉnh Đắk Lắk) thì bốc cháy.\n"
+                    "Tài xế ngụ tại tỉnh Thanh Hóa đã đưa hành khách thoát ra ngoài.")
+        self.assertEqual(r.province, "Đắk Lắk")
+
     def test_body_subgroup_zero_not_article_zero(self):
         r = extract_accident("Xe khách va chạm", content="Tài xế không bị thương.")
         self.assertIsNone(r.injuries)

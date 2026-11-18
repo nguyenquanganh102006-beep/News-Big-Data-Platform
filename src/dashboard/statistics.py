@@ -1,7 +1,8 @@
 """Publication-time statistics; no invented incident times or missing casualties."""
 import pandas as pd
 
-LABELS = {"accident": "Tai nạn", "uncertain": "Cần xem xét", "not_accident": "Không phải tai nạn"}
+LABELS = {"accident": "Tai nạn", "uncertain": "Cần xem xét", "not_accident": "Không phải tai nạn",
+          "skipped_video": "Video thiếu nội dung"}
 
 
 def local_times(frame, column="pub_date"):

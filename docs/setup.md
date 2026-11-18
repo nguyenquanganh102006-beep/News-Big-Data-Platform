@@ -119,7 +119,8 @@ Xem [luồng tổng thể](flow.md) và [hướng dẫn streaming](details/strea
 
 Sau khi đã có Silver accidents của cả 7 nguồn RSS:
 
-Preprocessor đọc toàn bộ snapshot Bronze duy nhất trong `data/bronze/` và các
+Preprocessor đọc toàn bộ snapshot Bronze duy nhất trong `data/bronze/`,
+`data/bronze/bronze/` và các
 snapshot crawl đã lưu ở `data_artifacts/diagnostics/`; bản sao cùng nguồn và tên
 snapshot chỉ được xử lý một lần.
 

@@ -105,6 +105,33 @@ class A2Tests(unittest.TestCase):
         self.assertFalse(changed["review_override_applied"][0])
         self.assertEqual(changed["accident_label"][0], "accident")
 
+    def test_body_enrichment_reaches_extraction_and_survives_cache_reuse(self):
+        self.state.ingest([record()])
+        body = "Xe tải va chạm xe máy tại Hà Nội khiến 2 người tử vong."
+        def enriched(frame, cache):
+            return frame.with_columns(pl.lit(body).alias("content"),
+                                      pl.lit("ok").alias("body_fetch_status"),
+                                      pl.col("link").alias("body_fetch_url"))
+        with patch("a2.processing.enrich_candidate_bodies", side_effect=enriched) as fetch, \
+             patch("a2.processing.fetch_vnexpress_locations"):
+            first, _ = prepare(self.state.frame(), self.root / "silver", enrich=True)
+            second, _ = prepare(self.state.frame(), self.root / "silver", enrich=True)
+        self.assertEqual(fetch.call_count, 1)
+        self.assertEqual(second["content"][0], body)
+        self.assertEqual(first["input_fingerprint"][0], self.state.frame()["input_fingerprint"][0])
+        self.assertEqual(second["body_fetch_status"][0], "ok")
+
+    def test_video_without_body_cannot_enter_matching_even_if_reviewed_positive(self):
+        self.state.ingest([record()])
+        raw = self.state.frame().row(0, named=True)
+        annotations = {raw["article_key"]: (raw["input_fingerprint"], "accident", "reviewed")}
+        def video(frame, cache):
+            return frame.with_columns(pl.lit("video_without_body").alias("body_fetch_status"))
+        with patch("a2.processing.enrich_candidate_bodies", side_effect=video):
+            frame, paths = prepare(self.state.frame(), self.root / "silver", annotations, enrich=True)
+        self.assertEqual(frame["accident_label"][0], "skipped_video")
+        self.assertEqual(sum(pl.read_parquet(p).height for p in paths.values()), 0)
+
     def test_null_metadata_does_not_discard_review_annotations(self):
         raw = json.loads(record().value)["article"]
         raw.update(system_created_at=None, accident_label="uncertain", filter_reason="reviewed")

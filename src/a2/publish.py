@@ -24,7 +24,7 @@ def publish(settings, catalog, state_counts, stats, revision, batch_revision):
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source, destination)
         unique = catalog.filter(~pl.col("is_duplicate"))
-        labels = {label: unique.filter(pl.col("accident_label") == label).height for label in ("accident", "uncertain", "not_accident")}
+        labels = {label: unique.filter(pl.col("accident_label") == label).height for label in ("accident", "uncertain", "not_accident", "skipped_video")}
         stream, batch = stats.get("stream", {}), stats.get("batch", {})
         sc, bc = stream.get("counts", {}), batch.get("counts", {})
         outbox = stats.get("bronze_inventory", {})
