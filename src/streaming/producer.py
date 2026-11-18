@@ -11,7 +11,10 @@ LOG = logging.getLogger(__name__)
 
 
 def enqueue_article(article, client=None, queue=None):
-    """Crawler interface: pass its Bronze row plus source; failures propagate."""
+    """Default: persist Bronze for the Kafka outbox. Explicit Redis clients are legacy-only."""
+    if client is None and queue is None:
+        from a2.producer import stage_article
+        return stage_article(article)
     owned = client is None
     try:
         row = normalize_article(article)
@@ -30,7 +33,7 @@ def enqueue_article(article, client=None, queue=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Enqueue one RSS Bronze JSON object")
+    parser = argparse.ArgumentParser(description="Stage one article JSON in Bronze; the A2 service forwards it to Kafka")
     parser.add_argument("file", type=Path)
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)

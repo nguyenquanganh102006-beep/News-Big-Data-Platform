@@ -31,6 +31,13 @@ def run_pipeline(step: int = 0, event_config=None) -> None:
 
 
 if __name__ == "__main__":
+    import sys
+    # A2 is the default continuous application. Explicit --step retains the
+    # legacy maintenance commands for old scripts/tests, never the live daemon.
+    if "--step" not in sys.argv and not any(arg.startswith("--step=") for arg in sys.argv):
+        from a2.runtime import main as a2_main
+        a2_main()
+        raise SystemExit(0)
     parser = argparse.ArgumentParser(description="RSS -> Bronze -> Silver articles -> Gold event database")
     parser.add_argument("--step", type=int, choices=(0, 1, 2, 3, 4, 5), default=0,
                         help="0: full pipeline, 1: crawlers, 2: preprocessors, 3: filters, 4: extract to Silver, 5: Silver to Gold events")

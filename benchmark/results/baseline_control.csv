@@ -1,0 +1,2 @@
+architecture,workload,run_id,input_count,output_count,total_duration_s,throughput_articles_s,latency_p50_ms,latency_p95_ms,failed_count,missing_count,duplicate_count,query_p95_ms,snapshot_export_s,drain_s,retry_pass,output_digest,batch_count,peak_ram_mb,avg_cpu_pct,resource_samples
+A2,T2,a2-t2-1117185442-82e9b9,10000,10000,51.015918254852295,196.01724995019308,684.656023979187,1246.5292215347283,0,0,0,2.321191399823874,0.0,1.019087791442871,True,fed22deb525372927e5281161fb336343bc7059ae5df504fe1f4f08e530b755f,46,904.6999999999999,157.20159999999998,25

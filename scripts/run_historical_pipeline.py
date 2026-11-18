@@ -1,4 +1,4 @@
-"""Process imported Bronze through Silver, Gold, real Redis replay, and dashboard."""
+"""Default CLI uses A2 Bronze/Kafka; retain legacy Redis helper for compatibility."""
 import argparse
 import json
 from datetime import datetime, timezone
@@ -63,4 +63,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # Historical CLI now follows the same Bronze -> Kafka path as the live service.
+    from a2.runtime import main as a2_main
+    a2_main()

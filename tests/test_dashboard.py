@@ -30,9 +30,9 @@ class DashboardTests(unittest.TestCase):
             with patch('config.DATA_DIR', str(root)):
                 app = AppTest.from_file(str(Path('src/dashboard/app.py').resolve()),default_timeout=30).run()
                 self.assertFalse(app.exception)
-                self.assertEqual(app.metric[0].value,'2')
+                # Article-only datasets must not be represented as two accidents.
+                self.assertEqual(len(app.metric), 0)
                 self.assertFalse(any(s.label=='Bộ dữ liệu' for s in app.selectbox))
-                self.assertFalse(app.checkbox[0].value)
     def test_search_is_literal_and_dates_use_vietnam_timezone(self):
         frame = pd.DataFrame({'title': ['Xe [1]', 'Tin khác'], 'source': ['one', 'two'],
                               'accident_label': ['accident', 'not_accident'],
@@ -68,18 +68,27 @@ class DashboardTests(unittest.TestCase):
                           'pub_date': ['2026-11-10T00:00:00Z']*2,
                           'description': ['Mô tả', 'Mô tả']}).write_parquet(file)
             before = file.read_bytes()
+            extracted = root/'extracted.parquet'
+            pl.DataFrame([row('a'), row('b', province=None)], schema=SCHEMA).write_parquet(extracted)
+            database = root/'gold/batch/canonical.duckdb'
+            database.parent.mkdir(parents=True)
+            run_batch({'test': extracted}, database)
+            db_before = database.read_bytes()
             with patch('config.DATA_DIR', str(root)):
                 app = AppTest.from_file(str(Path('src/dashboard/app.py').resolve()), default_timeout=30).run()
                 self.assertFalse(app.exception)
-                app.multiselect[1].set_value(['accident']).run()
+                app.text_input[0].set_value('no-such-location').run()
+                self.assertFalse(app.exception)
+                self.assertEqual(app.metric[0].value, '0')
+                app.text_input[0].set_value('').run()
                 self.assertFalse(app.exception)
                 self.assertEqual(app.metric[0].value, '1')
-                app.radio[0].set_value('Matching / trích xuất').run()
-                self.assertFalse(app.exception)
             self.assertEqual(before, file.read_bytes())
+            self.assertEqual(db_before, database.read_bytes())
 
     def test_ui_empty_dataset_has_no_exception(self):
         with TemporaryDirectory() as tmp, patch('config.DATA_DIR', tmp):
             app = AppTest.from_file(str(Path('src/dashboard/app.py').resolve()), default_timeout=30).run()
             self.assertFalse(app.exception)
-            self.assertEqual(app.metric[0].value, '0')
+            self.assertEqual(len(app.metric), 0)
+            self.assertTrue(app.info)

@@ -1,0 +1,11 @@
+{
+  "completed_architecture_runs": 28,
+  "baseline_redis_runs": 7,
+  "separate_A2_control_runs": 1,
+  "matching_repeats": 3,
+  "input_unchanged": true,
+  "architecture_output_articles_including_repetitions": 212000,
+  "benchmark_stack": "stopped; named volumes retained",
+  "production_dashboard_health": 200,
+  "redis_residual_pilot_keys": "see baseline_residual_queues.json; included in measured RAM"
+}

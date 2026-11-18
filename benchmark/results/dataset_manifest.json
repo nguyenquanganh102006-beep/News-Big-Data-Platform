@@ -1,0 +1,29 @@
+{
+  "articles": 20745,
+  "labels": [
+    {
+      "accident_label": "not_accident",
+      "len": 20388
+    },
+    {
+      "accident_label": "accident",
+      "len": 322
+    },
+    {
+      "accident_label": "uncertain",
+      "len": 35
+    }
+  ],
+  "sources": 7,
+  "sha256": "961cbb38ff94a8a5060b3efe1ff3699703d2d6a630fce81ea033d65773a5ecd7",
+  "source_sha256": "c2981bc61677788edae61af68fead9b713403a4c4cfa4dbd96ddf1705b3d8496",
+  "extraction_sha256": "b7e0207c825dd8fa85b69b70bde4b0418ba6ae37b06bd3df5d225b0c929f9aad",
+  "scope": "Kafka -> JSON parse -> identical Python/Polars transform -> commit. No runtime filtering, extraction, embedding or event matching.",
+  "dataset": "Real reviewed historical Silver articles; extraction precomputed for 357 candidate articles. event_id unknown, not fabricated.",
+  "workloads": {
+    "smoke": 100,
+    "T1": 1000,
+    "T2": 10000,
+    "T3": 20000
+  }
+}

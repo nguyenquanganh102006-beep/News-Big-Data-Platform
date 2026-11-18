@@ -186,4 +186,7 @@ def publish(data_root=DATA_DIR, artifacts_root=None):
 
 
 if __name__ == "__main__":
+    from a2.config import CURRENT
+    if CURRENT.exists():
+        raise SystemExit("A2 owns dashboard publication. Use the running A2 service, or stop it and run: python -m main --once")
     print(json.dumps(publish(), ensure_ascii=False, indent=2))

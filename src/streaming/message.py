@@ -29,6 +29,8 @@ def normalize_article(value):
     # Reuse the Phase 1 base schema; feed metadata is optional at this interface.
     for name in ("meta_title", "meta_description", "meta_link"):
         row.setdefault(name, None)
+    if row.get("system_created_at") is None:
+        row.pop("system_created_at", None)
     bronze = RssBronzeBaseModel.model_validate(row)
     row.update(bronze.model_dump(mode="json"))
     row.update(source=source, normalized_url=url, article_key=dedup_make_article_key(source, url))

@@ -1,0 +1,14 @@
+[
+  {
+    "key": "bench-b0-t2-1117183837-475a89:processing",
+    "type": "list",
+    "entries": 1,
+    "memory_bytes": 3160
+  },
+  {
+    "key": "bench-b0-t2-1117183837-475a89",
+    "type": "list",
+    "entries": 4710,
+    "memory_bytes": 17489292
+  }
+]

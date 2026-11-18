@@ -290,3 +290,7 @@ Tiến độ và kết quả từng bước được ghi vào
 bước, dùng `--start-at filter`, `extract`, `events`, `streaming` hoặc `publish`.
 Kho canonical mặc định trong `data/gold/batch/` được cập nhật từ kết quả
 snapshot sau khi publish thành công.
+
+# Luồng chính A2 — 18/11/2026
+
+Luồng mặc định hiện tại: Crawler → Bronze → Kafka → DuckDB journal → xử lý Polars dùng chung → Silver → matching streaming/batch → Gold provisional/canonical → snapshot dashboard. Producer đọc Bronze. Các phần Redis dưới đây mô tả luồng legacy. Xem [hướng dẫn A2](a2_live_pipeline.md) và [kết quả chạy thật](a2_migration_result.md).

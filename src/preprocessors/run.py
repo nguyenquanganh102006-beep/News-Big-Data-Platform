@@ -11,7 +11,7 @@ from .historical import preprocess_historical_files
 from config import DATA_DIR, DATA_ARTIFACTS_DIR, RSS_SOURCES
 
 
-def bronze_snapshots(crawled_date: str | None = None):
+def bronze_snapshots(crawled_date: str | None = None, fingerprint_cache=None):
     if crawled_date is None:
         prefix = None
     else:
@@ -31,7 +31,12 @@ def bronze_snapshots(crawled_date: str | None = None):
                 if prefix and not path.stem.startswith(prefix):
                     continue
                 identity = (source, path.name)
-                digest = hashlib.sha256(path.read_bytes()).hexdigest()
+                stamp = (path.stat().st_size, path.stat().st_mtime_ns)
+                cache_key = str(path.resolve())
+                previous = fingerprint_cache.get(cache_key) if fingerprint_cache is not None else None
+                digest = previous[1] if previous and previous[0] == stamp else hashlib.sha256(path.read_bytes()).hexdigest()
+                if fingerprint_cache is not None:
+                    fingerprint_cache[cache_key] = (stamp, digest)
                 if identity in discovered and discovered[identity][1] != digest:
                     raise ValueError(f"Conflicting Bronze snapshots for {source}: {path.name}")
                 discovered[identity] = (path, digest)

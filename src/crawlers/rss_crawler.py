@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import feedparser
 import polars as pl
+import requests
 
 from config import (
     DEBUG, RSS_SOURCES, DEFAULT_STRING, FEEDPARSER_MAP_FIELDS,
@@ -31,7 +32,11 @@ def crawl_rss(
     if DEBUG:
         print(f"[Info] Crawling RSS: {rss_url}")
 
-    feed = feedparser.parse(rss_url)
+    response = requests.get(rss_url, timeout=(10, 45), headers={"User-Agent": "NewsBigDataPlatform/1.0 RSS reader"})
+    response.raise_for_status()
+    feed = feedparser.parse(response.content)
+    if not feed.entries:
+        raise ValueError(f"RSS returned no articles: {rss_url}")
 
     if DEBUG:
         if feed.bozo:
@@ -99,10 +104,13 @@ def crawl_rss(
 
 
 
-def crawl_rss_sources() -> None:
+def crawl_rss_sources(only_sources=None):
     # Use Vietnam time consistently, independently of the host timezone.
     timestamp = datetime.now(timezone(timedelta(hours=7))).strftime("%Y%m%d_%H%M%S")
+    saved = {}
     for name, source in RSS_SOURCES.items():
+        if only_sources is not None and name not in only_sources:
+            continue
         directory = Path(source["bronze_dir"])
         directory.mkdir(parents=True, exist_ok=True)
         df = crawl_rss(
@@ -125,8 +133,10 @@ def crawl_rss_sources() -> None:
             with output:
                 df.write_parquet(output)
             break
+        saved[name] = {"path": str(save_path), "records": df.height}
 
         if DEBUG:
             print(f"[Info] Saved {name} df at: {save_path}")
             print(f"[Info] {name}_df.head():")
             print(df.head())
+    return saved

@@ -1,6 +1,6 @@
-"""Run the streaming pipeline independently of the existing batch main flow."""
+"""Default entry point for the shared A2 streaming and scheduled batch service."""
 
-from .consumer import main
+from a2.runtime import main
 
 
 def run_streaming():

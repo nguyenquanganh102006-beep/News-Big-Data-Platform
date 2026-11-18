@@ -1,0 +1,19 @@
+{
+  "scope": "Python production canonical batch matching only, on Windows host. No Kafka/Spark comparison. Load/fit/retrieval/scoring/aggregation/storage are included; embedding caches prewarmed.",
+  "source_sha256": "b7e0207c825dd8fa85b69b70bde4b0418ba6ae37b06bd3df5d225b0c929f9aad",
+  "articles": 322,
+  "config": {
+    "radius_hours": 48,
+    "threshold": 0.75,
+    "review_threshold": 0.6,
+    "min_margin": 0.1,
+    "min_coverage": 0.7,
+    "min_text_score": 0.6,
+    "min_evidence_text_score": 0.25,
+    "semantic_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    "semantic_cache_dir": null,
+    "followup_radius_hours": 168
+  },
+  "model_fingerprint": "b20c2695e157c56f7f042687716b4a22a59e083cf42da2f89de1b08ae26f0260",
+  "warmup_s": 48.83747489999223
+}
