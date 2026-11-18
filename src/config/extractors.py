@@ -8,7 +8,28 @@ from .filters import FILTER_SOURCES
 
 EXTRACT_SOURCES = FILTER_SOURCES
 EXTRACT_OUTPUT_DIR = os.path.join(DATA_SILVER_DIR, "accidents")
-EXTRACT_VERSION = "rules-v2"
+EXTRACT_VERSION = "rules-v3.3-scene-location-and-impact"
+VNEXPRESS_EXTRACT_VERSION = "rules-v3.3-scene-location-and-impact+vnexpress-dateline"
+VNEXPRESS_LOCATION_SELECTOR = "p.description span.location-stamp"
+VNEXPRESS_FETCH_TIMEOUT = (5, 20)
+VNEXPRESS_MAX_HTML_BYTES = 2_000_000
+VNEXPRESS_REQUEST_DELAY = 1.0
+
+
+@dataclass(frozen=True)
+class ArticleLocation:
+    status: str
+    province: str | None = None
+    text: str | None = None
+    url: str | None = None
+
+
+ARTICLE_LOCATION_SCHEMA = {
+    "article_location_text": pl.String,
+    "article_location_status": pl.String,
+    "article_location_url": pl.String,
+}
+
 # Text vocabulary includes historical names. No administrative remapping is inferred.
 PROVINCE_ALIASES = {
     "Hà Nội": ("Hà Nội",), "Hải Phòng": ("Hải Phòng",),
@@ -31,6 +52,7 @@ PROVINCE_NAMES = (
 )
 PROVINCE_ALIASES.update({name: (name,) for name in PROVINCE_NAMES})
 PROVINCE_ALIASES["TP Hồ Chí Minh"] += ("TP. HCM", "TPHCM", "TP. Hồ Chí Minh", "Sài Gòn")
+PROVINCE_ALIASES["Huế"] += ("TP. Huế", "TP Huế")
 PROVINCE_ALIASES["Đắk Lắk"] += ("Đăk Lăk", "Đắk Lăk")
 PROVINCE_ALIASES["Hòa Bình"] += ("Hoà Bình",)
 PROVINCE_ALIASES["Thanh Hóa"] += ("Thanh Hoá",)
@@ -41,19 +63,29 @@ VEHICLE_PATTERNS = {
     "xe đầu kéo": r"(?:xe )?đầu kéo", "xe container": r"(?:xe )?container",
     "xe ben": r"(?:xe|ô tô|ôtô) ben", "xe tải": r"(?:xe|ô tô|ôtô) tải",
     "xe buýt": r"xe buýt", "xe khách": r"xe khách", "taxi": r"taxi",
-    "ô tô": r"ô tô|ôtô", "tàu hỏa": r"tàu hỏa|tàu hoả|tàu lửa",
+    "ô tô": r"ô tô|ôtô", "tàu hỏa": r"tàu hỏa|tàu hoả|tàu lửa|tàu hàng",
     "xe cứu thương": r"(?:xe|ô tô|ôtô) cứu thương", "xe bồn": r"(?:xe|ô tô|ôtô) bồn",
     "xe ba gác": r"xe ba gác|xe ba bánh", "xe công trình": r"xe múc|xe xúc|xe lu|xe cẩu",
 }
 VEHICLE_SPECIFIC_PATTERN = r"\s+(?:tải|ben|khách|buýt|bồn|đầu kéo|container|cứu thương)\b"
 INCIDENT_PATTERNS = {
     "tong_duoi": r"tông đuôi|đâm (?:vào )?đuôi",
-    "va_cham": r"va chạm|tông|đâm (?:vào|trúng|nhau)|đấu đầu",
+    "va_cham": r"va chạm|tông|đâm (?:vào|trúng|nhau|dồn toa)|đấu đầu",
     "can_nguoi": r"cán (?:tử vong|chết|người|qua)|bị xe[^,.!?;]{0,35}cán",
     "lat_xe": r"lật (?:xe|ngửa)|xe[^,.!?;]{0,25}lật|lật nghiêng",
     "mat_lai": r"mất lái", "chay_xe": r"(?:xe[^,.!?;]{0,25})?(?:bốc cháy|cháy rụi)",
     "dam_vat_can": r"(?:đâm|tông|lao) (?:vào|trúng) (?:tường|cột|dải phân cách|lan can|gốc cây)",
     "tu_nga": r"tự ngã|ngã xe", "roi_xuong": r"(?:xe[^,.!?;]{0,25})?(?:lao|rơi) xuống (?:vực|sông|kênh|mương)",
+    "va_quet": r"va quẹt|va quệt|quệt vào",
+    "tat_dau_nga": r"tạt đầu[^.!?;]{0,80}(?:ngã|té)",
+    "sut_ho": r"(?:xe|ô tô|ôtô)[^.!?;]{0,55}(?:sụt|sụp|rơi) xuống hố|hố[^.!?;]{0,45}(?:nuốt chửng|làm sụt)[^.!?;]{0,35}(?:xe|ô tô|ôtô)",
+    "vat_de_xe": r"(?:cây|đá|mái tôn)[^.!?;]{0,55}(?:đổ|rơi|đè|trúng)[^.!?;]{0,55}(?:xe máy|ô tô|ôtô|người đi xe)|(?:xe máy|ô tô|ôtô)[^.!?;]{0,55}bị (?:cây|đá)[^.!?;]{0,30}(?:đổ|đè|trúng|vùi lấp)",
+    "nuoc_cuon_xe": r"(?:xe máy|ô tô|ôtô|người đi xe)[^.!?;]{0,45}(?:bị )?(?:nước|lũ|dòng nước|mưa)[^.!?;]{0,35}cuốn trôi|(?:nước|lũ|dòng nước|mưa)[^.!?;]{0,45}cuốn trôi[^.!?;]{0,25}(?:xe máy|ô tô|ôtô|người đi xe)|(?:xe máy|ô tô|ôtô)[^.!?;]{0,35}bị cuốn trôi",
+    "set_danh_nguoi_di_xe": r"sét đánh trúng[^.!?;]{0,65}(?:xe máy|xe đạp|ô tô|ôtô|đang chạy xe)",
+    "xe_bi_vui_lap": r"(?:xe máy|ô tô|ôtô)[^.!?;]{0,35}(?:bị )?vùi lấp",
+    "nguoi_di_xe_nga": r"(?:người đi xe máy|người đi xe đạp)[^.!?;]{0,30}(?:bị )?(?:té|ngã)",
+    "set_danh_khi_di_xe": r"sét đánh[^.!?;]{0,65}(?:đi xe máy|chạy xe máy|đang chạy xe)",
+    "cat_cuon_nguoi_di_xe": r"cuốn trôi[^.!?;]{0,40}người đi xe máy",
 }
 NUMBER_WORDS = {"không": 0, "một": 1, "hai": 2, "ba": 3, "bốn": 4,
                 "tư": 4, "năm": 5, "sáu": 6, "bảy": 7, "tám": 8, "chín": 9, "mười": 10}
@@ -61,21 +93,21 @@ NUMBER_TOKEN = r"không|một|mốt|hai|ba|bốn|tư|năm|lăm|sáu|bảy|tám|c
 NUMBER_PATTERN = rf"\d+(?:[.,]\d+)*|(?:{NUMBER_TOKEN})(?:\s+(?:{NUMBER_TOKEN}))*"
 NUMBER_WORDS.update({"mốt": 1, "lăm": 5})
 CASUALTY_PATTERNS = {"fatalities": r"tử vong|thiệt mạng|chết|tử nạn", "injuries": r"(?:bị )?thương(?!\s+vong)(?: tích)?|chấn thương"}
-SINGULAR_SUBJECT = r"(?:nam thanh niên|người phụ nữ|người đàn ông|tài xế|lái xe|phụ xe|học viên|thầy dạy lái)"
-CASUALTY_UNIT = rf"người|em|nạn nhân|học sinh|công nhân|hành khách|{SINGULAR_SUBJECT}"
+SINGULAR_SUBJECT = r"(?:nam thanh niên|người phụ nữ|người đàn ông|tài xế|lái xe|phụ xe|học viên|thầy dạy lái|nữ sinh|cô giáo(?: mầm non)?|cháu bé|trẻ nhỏ|cụ ông|cụ bà|cụ già|du khách(?: nước ngoài)?|CSGT)"
+CASUALTY_UNIT = rf"người|em|nạn nhân|học sinh|công nhân|hành khách|thanh thiếu niên|ông cháu|vợ chồng|{SINGULAR_SUBJECT}"
 APPROXIMATE_PATTERN = r"(?:hơn|ít nhất|khoảng|gần|trên|dưới|tới|đến|chừng|[-–]|\d\s+đến)\s*$"
-NON_SCENE_PATTERN = r"(?:quê(?: quán)?|trú|sinh sống|cư trú|bệnh viện|cấp cứu|điều trị|đưa về|đưa đến)[^,;.!?]*$"
-LOCATION_CONTEXT_PATTERN = r"(?:ở|tại|tỉnh|thành phố|tp\.?|địa bàn)\s*$"
+NON_SCENE_PATTERN = r"\b(?:quê(?: quán)?|trú|ngụ|sinh sống|cư trú|bệnh viện|cấp cứu|điều trị|đưa về|đưa đến|hướng từ|hướng về|hướng đi|chạy chiều|đi từ|trước đây thuộc|trước kia thuộc|biển số|mang biển|bks)\b[^;.!?]*$"
+LOCATION_CONTEXT_PATTERN = r"(?:ở|tại|tỉnh|thành phố|tp\.?|địa bàn|đoạn qua|thuộc)\s*$"
 ROAD_PREFIX_PATTERN = r"(?:cao tốc|quốc lộ|đường|đại lộ)\s*$"
 ADMIN_PREFIXES = {"district": r"quận|huyện|thị xã", "ward": r"phường|xã|thị trấn"}
-ADMIN_NAME_PATTERN = r"[^\W\d_]+(?:\s+[^\W\d_]+){0,7}|\d+"
+ADMIN_NAME_PATTERN = r"[^\W\d_]+(?:['’\-][^\W\d_]+)*(?:\s+[^\W\d_]+(?:['’\-][^\W\d_]+)*){0,7}|\d+"
 ROAD_PATTERN = r"(?:cao tốc|quốc lộ|đường|đại lộ)\s+[^,;.!?()]+"
 NEGATION_PATTERN = r"không|chưa|suýt|giả định|nếu|có thể|nguy cơ"
 FACT_NEGATION_PATTERN = r"\b(?:không|chưa|suýt|có thể|nguy cơ)(?:\s+\w+){0,3}\s*$"
 HYPOTHETICAL_PATTERN = r"\b(?:nếu|giả sử|giả định)\b"
 UPDATE_PATTERN = r"\b(?:thêm|sau đó|sau đấy|sau cấp cứu|không qua khỏi|nâng (?:tổng )?số|tăng lên)\b"
 MULTI_EVENT_PATTERN = r"\b(?:hai vụ|2 vụ|nhiều vụ|vụ thứ|vụ khác)\b"
-SCENE_PATTERN = r"\b(?:va chạm|xảy ra|tai nạn|hiện trường|cú tông)\b"
+SCENE_PATTERN = r"\b(?:va chạm|xảy ra|tai nạn|hiện trường|cú tông|khi đến|đoạn qua|bốc cháy|lao vào)\b"
 SUBJECT_ALIASES = {"lái xe": "tài xế"}
 DISJOINT_GROUP_PATTERN = r"người khác|còn lại|cả\s+\d+|tại hiện trường.*tại bệnh viện"
 VICTIM_AGE_PATTERN = r"(?:từ\s+)?\d+(?:\s*[-–]\s*\d+)?\s+tuổi\s+"
